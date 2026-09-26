@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "986184385015",
+    "project_id": "terriflow-35fb4",
+    "storage_bucket": "terriflow-35fb4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:986184385015:android:2b8c21e5efee48fcc62ef2",
+        "android_client_info": {
+          "package_name": "com.mraphaelpy.terriflow"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "986184385015-8u4inak79hprk3p8qb82f34emkt31q2c.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.mraphaelpy.terriflow",
+            "certificate_hash": "b54213db58aebdaad19666ce8f2efe72e7ff90fd"
+          }
+        },
+        {
+          "client_id": "986184385015-ussfn94qe39uf611kn7vghc9lj3ef5o2.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA54_Sfnihq3GQHlmNSZ7RO_o6JneJtQIg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "986184385015-ussfn94qe39uf611kn7vghc9lj3ef5o2.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,97 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Funções auxiliares
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['ADMIN', 'SUPER_ADMIN'];
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'SUPER_ADMIN';
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isActiveUser() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.active == true;
+    }
+
+    // Usuários
+    match /users/{userId} {
+      // isOwner() sem isActiveUser() evita dependência circular:
+      // isActiveUser() lê /users/{uid}, que exigiria isActiveUser(), travando tudo.
+      allow read: if isOwner(userId) || (isAuthenticated() && isActiveUser());
+
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || isAdmin();
+      // Apenas super_admin pode deletar usuários
+      allow delete: if isSuperAdmin();
+    }
+
+    // Territórios
+    match /territories/{territoryId} {
+      // Admins veem todos; responsáveis veem apenas os seus
+      allow read: if isAdmin() ||
+        (isActiveUser() &&
+          resource.data.currentResponsibleId == request.auth.uid);
+
+      // Criar apenas admins
+      allow create: if isAdmin();
+
+      // Atualizar: admin pode tudo; responsável apenas campos permitidos do próprio território
+      allow update: if isAdmin() ||
+        (isActiveUser() &&
+          resource.data.currentResponsibleId == request.auth.uid &&
+          onlyAllowedFields());
+
+      // Apenas super_admin pode deletar (hard delete)
+      allow delete: if isSuperAdmin();
+
+      // Subcoleção de eventos
+      match /events/{eventId} {
+        allow read: if isAdmin() ||
+          (isActiveUser() &&
+            get(/databases/$(database)/documents/territories/$(territoryId)).data.currentResponsibleId == request.auth.uid);
+
+        // Criar evento: admin ou responsável atual
+        allow create: if isAdmin() ||
+          (isActiveUser() &&
+            get(/databases/$(database)/documents/territories/$(territoryId)).data.currentResponsibleId == request.auth.uid);
+
+        // Eventos são imutáveis após criação
+        allow update, delete: if false;
+      }
+    }
+
+    // Notificações: usuário só acessa as próprias
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAdmin();
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow delete: if false;
+    }
+
+    // Device tokens (FCM)
+    // create usa request.resource pois o documento ainda não existe
+    match /deviceTokens/{tokenId} {
+      allow read, update, delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+    }
+
+    // Função auxiliar: campos que responsável pode alterar
+    function onlyAllowedFields() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(['status', 'startedAt', 'completedAt', 'returnedAt', 'updatedAt', 'notes', 'syncVersion']);
+    }
+  }
+}
