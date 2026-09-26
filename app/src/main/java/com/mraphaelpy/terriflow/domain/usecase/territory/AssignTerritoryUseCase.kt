@@ -35,6 +35,7 @@ class AssignTerritoryUseCase @Inject constructor(
             currentResponsibleId = responsible.id,
             currentResponsibleName = responsible.name,
             currentResponsiblePhotoUrl = responsible.photoUrl,
+            pastResponsibleIds = (territory.pastResponsibleIds + responsible.id).distinct(),
             assignedAt = now,
             updatedAt = now
         )

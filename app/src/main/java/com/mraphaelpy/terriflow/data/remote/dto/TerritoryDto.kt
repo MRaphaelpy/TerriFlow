@@ -27,6 +27,7 @@ data class TerritoryDto(
     val longitude: Double? = null,
     val boundaryPoints: List<Map<String, Double>> = emptyList(),
     val blockPolygons: List<String> = emptyList(),
+    val pastResponsibleIds: List<String> = emptyList(),
     val syncVersion: Long = 0L
 ) {
     fun toDomain() = Territory(
@@ -62,7 +63,8 @@ data class TerritoryDto(
                     if (lat != null && lng != null) LatLng(lat, lng) else null
                 } else null
             }
-        }.filter { it.size >= 3 }
+        }.filter { it.size >= 3 },
+        pastResponsibleIds = pastResponsibleIds
     )
 
     fun toMap() = buildMap<String, Any?> {
@@ -85,6 +87,7 @@ data class TerritoryDto(
         put("longitude", longitude)
         put("boundaryPoints", boundaryPoints)
         put("blockPolygons", blockPolygons)
+        put("pastResponsibleIds", pastResponsibleIds)
         put("syncVersion", syncVersion)
     }
 
@@ -121,6 +124,9 @@ data class TerritoryDto(
                 blockPolygons = (doc.get("blockPolygons") as? List<*>)
                     ?.filterIsInstance<String>()
                     ?: emptyList(),
+                pastResponsibleIds = (doc.get("pastResponsibleIds") as? List<*>)
+                    ?.filterIsInstance<String>()
+                    ?: emptyList(),
                 syncVersion = doc.getLong("syncVersion") ?: 0L
             )
         }
@@ -148,6 +154,7 @@ data class TerritoryDto(
             blockPolygons = t.blockPolygons.map { polygon ->
                 polygon.joinToString(";") { "${it.lat},${it.lng}" }
             },
+            pastResponsibleIds = t.pastResponsibleIds,
             syncVersion = syncVersion
         )
     }

@@ -28,8 +28,10 @@ class CompleteTerritoryUseCase @Inject constructor(
             ?: throw IllegalStateException("Território não encontrado")
         val now = Date()
 
+        val basePast = (territory.pastResponsibleIds + listOfNotNull(territory.currentResponsibleId)).distinct()
         val updated = territory.copy(
             status = TerritoryStatus.COMPLETED,
+            pastResponsibleIds = basePast,
             completedAt = now,
             updatedAt = now
         )
@@ -53,6 +55,7 @@ class CompleteTerritoryUseCase @Inject constructor(
                     currentResponsibleId = nextResponsible.id,
                     currentResponsibleName = nextResponsible.name,
                     currentResponsiblePhotoUrl = nextResponsible.photoUrl,
+                    pastResponsibleIds = (basePast + nextResponsible.id).distinct(),
                     assignedAt = now,
                     completedAt = null,
                     startedAt = null,

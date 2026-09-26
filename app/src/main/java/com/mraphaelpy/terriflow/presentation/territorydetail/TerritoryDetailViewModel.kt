@@ -32,6 +32,15 @@ data class TerritoryDetailUiState(
 ) {
     val isAdmin: Boolean get() = currentUser?.role?.name == "ADMIN" || currentUser?.role?.name == "SUPER_ADMIN"
     
+    val rotationInfo: List<com.mraphaelpy.terriflow.domain.model.ResponsibleRotationInfo> get() =
+        com.mraphaelpy.terriflow.domain.model.TerritoryRotationHelper.computeRotationInfo(responsibles, territory, events)
+
+    val pastWorkers: List<com.mraphaelpy.terriflow.domain.model.ResponsibleRotationInfo> get() =
+        rotationInfo.filter { it.hasWorkedPreviously }.sortedByDescending { it.lastAssignedDate }
+
+    val suggestedWorkers: List<com.mraphaelpy.terriflow.domain.model.ResponsibleRotationInfo> get() =
+        rotationInfo.filter { !it.hasWorkedPreviously && it.user.id != territory?.currentResponsibleId }
+
     val historyCycles: List<HistoryCycle> get() {
         val cycles = mutableListOf<HistoryCycle>()
         var currentResponsible = "Sistema / Não atribuído"
@@ -102,6 +111,9 @@ class TerritoryDetailViewModel @Inject constructor(
             userRepository.observeResponsibles().collect { responsibles ->
                 _uiState.update { it.copy(responsibles = responsibles) }
             }
+        }
+        viewModelScope.launch {
+            runCatching { eventRepository.syncFromRemote(territoryId) }
         }
     }
 

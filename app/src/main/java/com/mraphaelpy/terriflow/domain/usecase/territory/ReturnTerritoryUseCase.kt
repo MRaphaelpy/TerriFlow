@@ -22,8 +22,10 @@ class ReturnTerritoryUseCase @Inject constructor(
             ?: throw IllegalStateException("Território não encontrado")
         val now = Date()
 
+        val basePast = (territory.pastResponsibleIds + listOfNotNull(territory.currentResponsibleId)).distinct()
         val updated = territory.copy(
             status = TerritoryStatus.RETURNED,
+            pastResponsibleIds = basePast,
             currentResponsibleId = null,
             currentResponsibleName = null,
             currentResponsiblePhotoUrl = null,

@@ -16,7 +16,7 @@ import com.mraphaelpy.terriflow.data.local.entity.*
         TerritoryEventEntity::class,
         NotificationEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -69,6 +69,12 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_7_8 = object : Migration(7, 8) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE territory_events ADD COLUMN congregationId TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE territories ADD COLUMN pastResponsibleIds TEXT NOT NULL DEFAULT ''")
             }
         }
     }

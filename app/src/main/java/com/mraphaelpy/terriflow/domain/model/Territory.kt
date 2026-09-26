@@ -42,7 +42,8 @@ data class Territory(
     val latitude: Double? = null,
     val longitude: Double? = null,
     val boundaryPoints: List<LatLng> = emptyList(),
-    val blockPolygons: List<List<LatLng>> = emptyList()
+    val blockPolygons: List<List<LatLng>> = emptyList(),
+    val pastResponsibleIds: List<String> = emptyList()
 ) {
     val hasLocation: Boolean get() = latitude != null && longitude != null
     val hasBoundary: Boolean get() = boundaryPoints.size >= 3
