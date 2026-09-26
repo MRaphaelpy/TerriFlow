@@ -15,10 +15,15 @@ import javax.inject.Singleton
 class FirestoreUserSource @Inject constructor(
     private val firestore: FirebaseFirestore
 ) {
-    private val usersCollection = firestore.collection("users")
+    // Global user doc (stores congregationId so we can look it up after login)
+    private val globalUsersCollection = firestore.collection("users")
 
-    fun observeAll(): Flow<List<UserDto>> = callbackFlow {
-        val sub = usersCollection
+    // Congregation-scoped user collection
+    private fun congregationUsersCollection(congregationId: String) =
+        firestore.collection("congregations").document(congregationId).collection("users")
+
+    fun observeAll(congregationId: String): Flow<List<UserDto>> = callbackFlow {
+        val sub = congregationUsersCollection(congregationId)
             .whereEqualTo("active", true)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) { close(error); return@addSnapshotListener }
@@ -29,30 +34,47 @@ class FirestoreUserSource @Inject constructor(
         awaitClose { sub.remove() }
     }
 
-    suspend fun getById(id: String): UserDto? {
-        val doc = usersCollection.document(id).get().await()
+    suspend fun getById(congregationId: String, id: String): UserDto? {
+        val doc = congregationUsersCollection(congregationId).document(id).get().await()
         return UserDto.fromDocument(doc)
     }
 
-    suspend fun upsert(user: User) {
-        val dto = UserDto.fromDomain(user)
-        usersCollection.document(user.id).set(dto.toMap(), SetOptions.merge()).await()
+    /** Returns the congregationId stored in the global /users/{uid} doc */
+    suspend fun getCongregationIdForUser(uid: String): String? {
+        val doc = globalUsersCollection.document(uid).get().await()
+        if (!doc.exists()) return null
+        return doc.getString("congregationId")
     }
 
-    suspend fun addFcmToken(userId: String, token: String) {
-        usersCollection.document(userId)
+    /** Saves the congregationId pointer in the global /users/{uid} doc */
+    suspend fun saveGlobalPointer(uid: String, congregationId: String) {
+        globalUsersCollection.document(uid).set(
+            mapOf("congregationId" to congregationId),
+            SetOptions.merge()
+        ).await()
+    }
+
+    suspend fun upsert(congregationId: String, user: User) {
+        val dto = UserDto.fromDomain(user)
+        congregationUsersCollection(congregationId).document(user.id).set(dto.toMap(), SetOptions.merge()).await()
+        // Keep global pointer up to date
+        saveGlobalPointer(user.id, congregationId)
+    }
+
+    suspend fun addFcmToken(congregationId: String, userId: String, token: String) {
+        congregationUsersCollection(congregationId).document(userId)
             .update("fcmTokens", com.google.firebase.firestore.FieldValue.arrayUnion(token))
             .await()
     }
 
-    suspend fun removeFcmToken(userId: String, token: String) {
-        usersCollection.document(userId)
+    suspend fun removeFcmToken(congregationId: String, userId: String, token: String) {
+        congregationUsersCollection(congregationId).document(userId)
             .update("fcmTokens", com.google.firebase.firestore.FieldValue.arrayRemove(token))
             .await()
     }
 
-    suspend fun getFcmTokens(userId: String): List<String> {
-        val dto = getById(userId) ?: return emptyList()
+    suspend fun getFcmTokens(congregationId: String, userId: String): List<String> {
+        val dto = getById(congregationId, userId) ?: return emptyList()
         return dto.fcmTokens
     }
 }

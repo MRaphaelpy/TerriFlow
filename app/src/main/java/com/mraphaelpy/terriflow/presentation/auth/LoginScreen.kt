@@ -40,6 +40,7 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit,
     onNavigateToRegister: () -> Unit,
     onNavigateToReset: () -> Unit,
+    onNeedsCongregationSetup: () -> Unit,
     viewModel: AuthViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -52,6 +53,10 @@ fun LoginScreen(
 
     LaunchedEffect(uiState.isLoggedIn) {
         if (uiState.isLoggedIn) onLoginSuccess()
+    }
+
+    LaunchedEffect(uiState.needsCongregationSetup) {
+        if (uiState.needsCongregationSetup) onNeedsCongregationSetup()
     }
 
     val webClientId = androidx.compose.ui.res.stringResource(id = R.string.default_web_client_id)

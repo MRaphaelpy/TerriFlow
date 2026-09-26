@@ -35,5 +35,6 @@ data class TerritoryEvent(
     val userName: String = "",
     val type: EventType = EventType.CREATED,
     val timestamp: Date = Date(),
-    val extra: Map<String, String> = emptyMap()
+    val extra: Map<String, String> = emptyMap(),
+    val congregationId: String = ""
 )

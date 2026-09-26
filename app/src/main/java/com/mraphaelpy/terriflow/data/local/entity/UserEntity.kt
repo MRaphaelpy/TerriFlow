@@ -16,6 +16,7 @@ data class UserEntity(
     val active: Boolean,
     val photoUrl: String? = null,
     val fcmTokens: List<String> = emptyList(),
+    val congregationId: String = "",
     val synced: Boolean = true,
     val updatedAt: Date = Date(),
     val deletedAt: Date? = null
@@ -28,7 +29,8 @@ data class UserEntity(
         createdAt = createdAt,
         active = active,
         photoUrl = photoUrl,
-        fcmTokens = fcmTokens
+        fcmTokens = fcmTokens,
+        congregationId = congregationId
     )
 
     companion object {
@@ -41,6 +43,7 @@ data class UserEntity(
             active = user.active,
             photoUrl = user.photoUrl,
             fcmTokens = user.fcmTokens,
+            congregationId = user.congregationId,
             synced = synced,
             updatedAt = Date()
         )

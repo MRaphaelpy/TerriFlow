@@ -12,7 +12,8 @@ data class TerritoryEventDto(
     val userName: String = "",
     val type: String = "",
     val timestamp: Timestamp = Timestamp.now(),
-    val extra: Map<String, String> = emptyMap()
+    val extra: Map<String, String> = emptyMap(),
+    val congregationId: String = ""
 ) {
     fun toDomain() = TerritoryEvent(
         id = id,
@@ -21,7 +22,8 @@ data class TerritoryEventDto(
         userName = userName,
         type = runCatching { EventType.valueOf(type) }.getOrDefault(EventType.UPDATED),
         timestamp = timestamp.toDate(),
-        extra = extra
+        extra = extra,
+        congregationId = congregationId
     )
 
     fun toMap() = mapOf(
@@ -30,7 +32,8 @@ data class TerritoryEventDto(
         "userName" to userName,
         "type" to type,
         "timestamp" to timestamp,
-        "extra" to extra
+        "extra" to extra,
+        "congregationId" to congregationId
     )
 
     companion object {
@@ -44,7 +47,8 @@ data class TerritoryEventDto(
                 userName = doc.getString("userName") ?: "",
                 type = doc.getString("type") ?: "",
                 timestamp = doc.getTimestamp("timestamp") ?: Timestamp.now(),
-                extra = (doc.get("extra") as? Map<String, String>) ?: emptyMap()
+                extra = (doc.get("extra") as? Map<String, String>) ?: emptyMap(),
+                congregationId = doc.getString("congregationId") ?: ""
             )
         }
 
@@ -55,7 +59,8 @@ data class TerritoryEventDto(
             userName = event.userName,
             type = event.type.name,
             timestamp = Timestamp(event.timestamp),
-            extra = event.extra
+            extra = event.extra,
+            congregationId = event.congregationId
         )
     }
 }

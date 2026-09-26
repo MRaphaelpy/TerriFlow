@@ -1,6 +1,6 @@
 package com.mraphaelpy.terriflow.data.repository
 
-import com.mraphaelpy.terriflow.domain.repository.AuthRepository
+import android.util.Log
 import com.google.firebase.firestore.FirebaseFirestore
 import com.mraphaelpy.terriflow.data.local.dao.TerritoryDao
 import com.mraphaelpy.terriflow.data.local.entity.TerritoryEntity
@@ -8,21 +8,22 @@ import com.mraphaelpy.terriflow.data.remote.dto.TerritoryDto
 import com.mraphaelpy.terriflow.data.remote.source.FirestoreTerritorySource
 import com.mraphaelpy.terriflow.domain.model.Territory
 import com.mraphaelpy.terriflow.domain.model.TerritoryStatus
+import com.mraphaelpy.terriflow.domain.repository.AuthRepository
+import com.mraphaelpy.terriflow.domain.repository.CongregationRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.tasks.await
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
-import android.util.Log
 
 @Singleton
 class TerritoryRepositoryImpl @Inject constructor(
     private val territoryDao: TerritoryDao,
     private val remoteSource: FirestoreTerritorySource,
     private val firestore: FirebaseFirestore,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val congregationRepository: CongregationRepository
 ) : TerritoryRepository {
 
     override fun observeAll(): Flow<List<Territory>> =
@@ -46,15 +47,15 @@ class TerritoryRepositoryImpl @Inject constructor(
     override suspend fun getById(id: String): Territory? {
         val local = territoryDao.getById(id)
         if (local != null) return local.toDomain()
-        
-        return runCatching { remoteSource.getById(id)?.toDomain() }.getOrNull()
+        val congregationId = congregationRepository.getCurrentCongregationId() ?: return null
+        return runCatching { remoteSource.getById(congregationId, id)?.toDomain() }.getOrNull()
     }
 
     override suspend fun getByCode(code: String): Territory? {
         val local = territoryDao.getByCode(code)
         if (local != null) return local.toDomain()
-        
-        return runCatching { remoteSource.getByCode(code)?.toDomain() }.getOrNull()
+        val congregationId = congregationRepository.getCurrentCongregationId() ?: return null
+        return runCatching { remoteSource.getByCode(congregationId, code)?.toDomain() }.getOrNull()
     }
 
     override suspend fun save(territory: Territory): Territory {
@@ -62,32 +63,37 @@ class TerritoryRepositoryImpl @Inject constructor(
             territory.copy(id = UUID.randomUUID().toString())
         } else territory
 
-        // 1. Salvar local imediatamente (offline-first)
         territoryDao.upsert(TerritoryEntity.fromDomain(toSave, synced = false))
 
-        // 2. Tentar enviar ao Firestore
-        runCatching {
-            val localVersion = territoryDao.getById(toSave.id)?.syncVersion ?: 0L
-            val nextVersion = localVersion + 1
-            remoteSource.upsert(toSave, nextVersion)
-            territoryDao.markSynced(toSave.id, nextVersion)
-        }.onFailure {
-            Log.e("TerritoryRepositoryImpl", "Error saving to remote", it)
+        val congregationId = congregationRepository.getCurrentCongregationId()
+        if (congregationId != null) {
+            runCatching {
+                val localVersion = territoryDao.getById(toSave.id)?.syncVersion ?: 0L
+                val nextVersion = localVersion + 1
+                remoteSource.upsert(congregationId, toSave, nextVersion)
+                territoryDao.markSynced(toSave.id, nextVersion)
+            }.onFailure {
+                Log.e("TerritoryRepositoryImpl", "Error saving to remote", it)
+            }
         }
 
         return toSave
     }
 
-    override suspend fun getNextCode(): String =
-        runCatching { remoteSource.getNextCode() }.getOrElse {
+    override suspend fun getNextCode(): String {
+        val congregationId = congregationRepository.getCurrentCongregationId()
+            ?: return "T-%05d".format(System.currentTimeMillis() % 100000)
+        return runCatching { remoteSource.getNextCode(congregationId) }.getOrElse {
             "T-%05d".format(System.currentTimeMillis() % 100000)
         }
+    }
 
     override suspend fun syncPendingToRemote() {
+        val congregationId = congregationRepository.getCurrentCongregationId() ?: return
         territoryDao.getPending().forEach { entity ->
             runCatching {
                 val nextVersion = entity.syncVersion + 1
-                remoteSource.upsert(entity.toDomain(), nextVersion)
+                remoteSource.upsert(congregationId, entity.toDomain(), nextVersion)
                 territoryDao.markSynced(entity.id, nextVersion)
             }
         }
@@ -96,33 +102,26 @@ class TerritoryRepositoryImpl @Inject constructor(
     override suspend fun syncFromRemote() {
         runCatching {
             authRepository.getCurrentUser() ?: return@runCatching
+            val congregationId = congregationRepository.getCurrentCongregationId() ?: return@runCatching
 
-            val query = firestore.collection("territories")
-
-            val snapshot = query.get().await()
-            val remoteDtos = snapshot.documents.mapNotNull { TerritoryDto.fromDocument(it) }
+            val remoteDtos = remoteSource.getAll(congregationId)
 
             remoteDtos.forEach { dto ->
                 val local = territoryDao.getById(dto.id)
                 when {
-                    // Não existe localmente → aceitar remoto
                     local == null -> {
                         territoryDao.upsert(
                             TerritoryEntity.fromDomain(dto.toDomain(), synced = true)
                                 .copy(syncVersion = dto.syncVersion)
                         )
                     }
-                    // Local tem alterações pendentes (não sincronizadas) → local vence
-                    // O SyncWorker vai enviar o local para o remoto em seguida
                     !local.synced -> return@forEach
-                    // Local sincronizado: aceitar remoto se versão for >= local
                     dto.syncVersion >= local.syncVersion -> {
                         territoryDao.upsert(
                             TerritoryEntity.fromDomain(dto.toDomain(), synced = true)
                                 .copy(syncVersion = dto.syncVersion)
                         )
                     }
-                    // Local tem versão mais nova que remoto → não sobrescrever
                     else -> return@forEach
                 }
             }
@@ -139,8 +138,9 @@ class TerritoryRepositoryImpl @Inject constructor(
 
     override suspend fun delete(id: String) {
         territoryDao.softDelete(id, System.currentTimeMillis())
-        runCatching {
-            firestore.collection("territories").document(id).delete().await()
+        val congregationId = congregationRepository.getCurrentCongregationId()
+        if (congregationId != null) {
+            runCatching { remoteSource.delete(congregationId, id) }
         }
     }
 }

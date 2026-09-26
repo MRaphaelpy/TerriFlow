@@ -20,6 +20,7 @@ data class TerritoryEventEntity(
     val type: String,
     val timestamp: Date,
     val extra: Map<String, String> = emptyMap(),
+    val congregationId: String = "",
     val synced: Boolean = false
 ) {
     fun toDomain() = TerritoryEvent(
@@ -29,7 +30,8 @@ data class TerritoryEventEntity(
         userName = userName,
         type = EventType.valueOf(type),
         timestamp = timestamp,
-        extra = extra
+        extra = extra,
+        congregationId = congregationId
     )
 
     companion object {
@@ -41,6 +43,7 @@ data class TerritoryEventEntity(
             type = event.type.name,
             timestamp = event.timestamp,
             extra = event.extra,
+            congregationId = event.congregationId,
             synced = synced
         )
     }

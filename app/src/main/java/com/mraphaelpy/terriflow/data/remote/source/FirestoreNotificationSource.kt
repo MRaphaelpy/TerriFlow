@@ -16,10 +16,11 @@ import javax.inject.Singleton
 class FirestoreNotificationSource @Inject constructor(
     private val firestore: FirebaseFirestore
 ) {
-    private val notificationsCollection = firestore.collection("notifications")
+    private fun notificationsCollection(congregationId: String) =
+        firestore.collection("congregations").document(congregationId).collection("notifications")
 
-    fun observeByUser(userId: String): Flow<List<AppNotification>> = callbackFlow {
-        val sub = notificationsCollection
+    fun observeByUser(congregationId: String, userId: String): Flow<List<AppNotification>> = callbackFlow {
+        val sub = notificationsCollection(congregationId)
             .whereEqualTo("userId", userId)
             .orderBy("createdAt", Query.Direction.DESCENDING)
             .limit(50)
@@ -47,8 +48,8 @@ class FirestoreNotificationSource @Inject constructor(
         awaitClose { sub.remove() }
     }
 
-    suspend fun insert(notification: AppNotification) {
-        notificationsCollection.document(notification.id).set(
+    suspend fun insert(congregationId: String, notification: AppNotification) {
+        notificationsCollection(congregationId).document(notification.id).set(
             mapOf(
                 "userId" to notification.userId,
                 "title" to notification.title,
@@ -62,10 +63,10 @@ class FirestoreNotificationSource @Inject constructor(
         ).await()
     }
 
-    suspend fun getByUser(userId: String): List<AppNotification> {
-        val snapshot = notificationsCollection
+    suspend fun getByUser(congregationId: String, userId: String): List<AppNotification> {
+        val snapshot = notificationsCollection(congregationId)
             .whereEqualTo("userId", userId)
-            .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .orderBy("createdAt", Query.Direction.DESCENDING)
             .limit(50)
             .get()
             .await()

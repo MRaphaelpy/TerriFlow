@@ -64,6 +64,7 @@ sealed class Screen(val route: String) {
     object Coverage : Screen("coverage")
     object ImportKml : Screen("territories/import")
     object Settings : Screen("settings")
+    object CongregationSetup : Screen("congregation_setup")
 }
 
 @Composable
@@ -119,7 +120,12 @@ fun AppNavigation(
                     }
                 },
                 onNavigateToRegister = { navController.navigate(Screen.Register.route) },
-                onNavigateToReset = { navController.navigate(Screen.ResetPassword.route) }
+                onNavigateToReset = { navController.navigate(Screen.ResetPassword.route) },
+                onNeedsCongregationSetup = {
+                    navController.navigate(Screen.CongregationSetup.route) {
+                        popUpTo(Screen.Login.route) { inclusive = true }
+                    }
+                }
             )
         }
 
@@ -130,12 +136,27 @@ fun AppNavigation(
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 },
-                onNavigateBack = { navController.popBackStack() }
+                onNavigateBack = { navController.popBackStack() },
+                onNeedsCongregationSetup = {
+                    navController.navigate(Screen.CongregationSetup.route) {
+                        popUpTo(Screen.Login.route) { inclusive = true }
+                    }
+                }
             )
         }
 
         composable(Screen.ResetPassword.route) {
             ResetPasswordScreen(onNavigateBack = { navController.popBackStack() })
+        }
+
+        composable(Screen.CongregationSetup.route) {
+            com.mraphaelpy.terriflow.presentation.congregation.CongregationSetupScreen(
+                onSetupComplete = {
+                    navController.navigate(Screen.Dashboard.route) {
+                        popUpTo(Screen.CongregationSetup.route) { inclusive = true }
+                    }
+                }
+            )
         }
 
         composable(Screen.Dashboard.route) {

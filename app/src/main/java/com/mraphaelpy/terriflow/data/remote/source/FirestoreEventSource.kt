@@ -15,11 +15,24 @@ import javax.inject.Singleton
 class FirestoreEventSource @Inject constructor(
     private val firestore: FirebaseFirestore
 ) {
-    private fun eventsCollection(territoryId: String) =
-        firestore.collection("territories").document(territoryId).collection("events")
+    private fun eventsCollection(congregationId: String, territoryId: String) =
+        firestore.collection("congregations").document(congregationId)
+            .collection("territories").document(territoryId)
+            .collection("events")
 
-    fun observeRecentGlobal(limit: Long = 50): Flow<List<TerritoryEventDto>> = callbackFlow {
-        val sub = firestore.collectionGroup("events")
+    fun observeRecentGlobal(congregationId: String, limit: Long = 50): Flow<List<TerritoryEventDto>> = callbackFlow {
+        val sub = firestore.collection("congregations").document(congregationId)
+            .collection("territories")
+            .also { } // we use collectionGroup scoped to congregation path
+        // Use collectionGroup filtered by path prefix approach:
+        // Firestore collectionGroup doesn't support path-prefix filtering directly,
+        // so we query the congregation territories sub-collection group
+        val subscription = firestore.collectionGroup("events")
+            .whereGreaterThanOrEqualTo(
+                com.google.firebase.firestore.FieldPath.documentId(),
+                "congregations/$congregationId/territories/"
+            )
+            .orderBy(com.google.firebase.firestore.FieldPath.documentId())
             .orderBy("timestamp", Query.Direction.DESCENDING)
             .limit(limit)
             .addSnapshotListener { snapshot, error ->
@@ -27,11 +40,11 @@ class FirestoreEventSource @Inject constructor(
                 val list = snapshot?.documents?.mapNotNull { TerritoryEventDto.fromDocument(it) } ?: emptyList()
                 trySend(list)
             }
-        awaitClose { sub.remove() }
+        awaitClose { subscription.remove() }
     }
 
-    fun observeByTerritory(territoryId: String): Flow<List<TerritoryEventDto>> = callbackFlow {
-        val sub = eventsCollection(territoryId)
+    fun observeByTerritory(congregationId: String, territoryId: String): Flow<List<TerritoryEventDto>> = callbackFlow {
+        val sub = eventsCollection(congregationId, territoryId)
             .orderBy("timestamp")
             .addSnapshotListener { snapshot, error ->
                 if (error != null) { close(error); return@addSnapshotListener }
@@ -42,21 +55,21 @@ class FirestoreEventSource @Inject constructor(
         awaitClose { sub.remove() }
     }
 
-    suspend fun insert(event: TerritoryEvent) {
+    suspend fun insert(congregationId: String, event: TerritoryEvent) {
         val dto = TerritoryEventDto.fromDomain(event)
-        eventsCollection(event.territoryId).document(event.id).set(dto.toMap()).await()
+        eventsCollection(congregationId, event.territoryId).document(event.id).set(dto.toMap()).await()
     }
 
-    suspend fun getByTerritory(territoryId: String): List<TerritoryEventDto> {
-        val snapshot = eventsCollection(territoryId)
+    suspend fun getByTerritory(congregationId: String, territoryId: String): List<TerritoryEventDto> {
+        val snapshot = eventsCollection(congregationId, territoryId)
             .orderBy("timestamp")
             .get()
             .await()
         return snapshot.documents.mapNotNull { TerritoryEventDto.fromDocument(it) }
     }
 
-    suspend fun exists(territoryId: String, eventId: String): Boolean {
-        val doc = eventsCollection(territoryId).document(eventId).get().await()
+    suspend fun exists(congregationId: String, territoryId: String, eventId: String): Boolean {
+        val doc = eventsCollection(congregationId, territoryId).document(eventId).get().await()
         return doc.exists()
     }
 }

@@ -3,6 +3,7 @@ package com.mraphaelpy.terriflow.presentation.auth
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mraphaelpy.terriflow.domain.repository.AuthRepository
+import com.mraphaelpy.terriflow.domain.repository.CongregationRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,13 +14,15 @@ import javax.inject.Inject
 data class AuthUiState(
     val isLoading: Boolean = false,
     val isLoggedIn: Boolean = false,
+    val needsCongregationSetup: Boolean = false,
     val error: String? = null,
     val resetEmailSent: Boolean = false
 )
 
 @HiltViewModel
 class AuthViewModel @Inject constructor(
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val congregationRepository: CongregationRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AuthUiState(isLoggedIn = authRepository.isLoggedIn))
@@ -33,7 +36,14 @@ class AuthViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             runCatching { authRepository.login(email.trim(), password) }
-                .onSuccess { _uiState.value = _uiState.value.copy(isLoading = false, isLoggedIn = true) }
+                .onSuccess {
+                    val hasCongregation = authRepository.resolveAndSaveCongregationId() != null
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        isLoggedIn = hasCongregation,
+                        needsCongregationSetup = !hasCongregation
+                    )
+                }
                 .onFailure { _uiState.value = _uiState.value.copy(isLoading = false, error = friendlyError(it)) }
         }
     }
@@ -50,7 +60,10 @@ class AuthViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             runCatching { authRepository.register(name.trim(), email.trim(), password) }
-                .onSuccess { _uiState.value = _uiState.value.copy(isLoading = false, isLoggedIn = true) }
+                .onSuccess {
+                    // New accounts never have a congregation yet
+                    _uiState.value = _uiState.value.copy(isLoading = false, needsCongregationSetup = true)
+                }
                 .onFailure { _uiState.value = _uiState.value.copy(isLoading = false, error = friendlyError(it)) }
         }
     }
@@ -59,7 +72,14 @@ class AuthViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             runCatching { authRepository.signInWithGoogle(idToken) }
-                .onSuccess { _uiState.value = _uiState.value.copy(isLoading = false, isLoggedIn = true) }
+                .onSuccess {
+                    val hasCongregation = authRepository.resolveAndSaveCongregationId() != null
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        isLoggedIn = hasCongregation,
+                        needsCongregationSetup = !hasCongregation
+                    )
+                }
                 .onFailure { _uiState.value = _uiState.value.copy(isLoading = false, error = friendlyError(it)) }
         }
     }

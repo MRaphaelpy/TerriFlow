@@ -34,6 +34,7 @@ import com.mraphaelpy.terriflow.presentation.components.LoadingDialog
 fun RegisterScreen(
     onRegisterSuccess: () -> Unit,
     onNavigateBack: () -> Unit,
+    onNeedsCongregationSetup: () -> Unit,
     viewModel: AuthViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -46,6 +47,10 @@ fun RegisterScreen(
 
     LaunchedEffect(uiState.isLoggedIn) {
         if (uiState.isLoggedIn) onRegisterSuccess()
+    }
+
+    LaunchedEffect(uiState.needsCongregationSetup) {
+        if (uiState.needsCongregationSetup) onNeedsCongregationSetup()
     }
 
     Box(

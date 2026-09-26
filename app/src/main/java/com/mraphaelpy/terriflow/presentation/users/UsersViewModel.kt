@@ -33,6 +33,9 @@ class UsersViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
+            runCatching { userRepository.syncFromRemote() }
+        }
+        viewModelScope.launch {
             combine(
                 authRepository.observeCurrentUser(),
                 userRepository.observeAll()

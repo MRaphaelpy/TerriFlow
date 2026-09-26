@@ -1,12 +1,27 @@
 package com.mraphaelpy.terriflow.presentation.map
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Canvas
+import android.graphics.Color as AndroidColor
 import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.Point
+import android.graphics.RadialGradient
+import android.graphics.RectF
+import android.graphics.Shader
 import android.graphics.drawable.BitmapDrawable
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import android.location.Location
 import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,6 +52,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -48,8 +64,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -73,7 +91,13 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
+import org.osmdroid.views.overlay.compass.CompassOverlay
+import org.osmdroid.views.overlay.compass.InternalCompassOrientationProvider
 import org.osmdroid.views.overlay.infowindow.InfoWindow
+import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
+import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
+import org.osmdroid.views.Projection
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.net.toUri
 
@@ -90,6 +114,27 @@ fun MapScreen(
     var selectedStatus by remember { mutableStateOf<TerritoryStatus?>(null) }
     var selectedTerritory by remember { mutableStateOf<Territory?>(null) }
     var onlyMine by remember { mutableStateOf(false) }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { _ -> }
+
+    LaunchedEffect(Unit) {
+        val fineGranted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        val coarseGranted = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!fineGranted && !coarseGranted) {
+            permissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
+    }
 
 
     LaunchedEffect(highlightId, uiState.territoriesWithLocation) {
@@ -159,6 +204,8 @@ fun MapScreen(
             )
         }
     ) { padding ->
+        var mapViewRef by remember { mutableStateOf<MapView?>(null) }
+
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
 
             AllTerritoriesMap(
@@ -166,6 +213,7 @@ fun MapScreen(
                 territories = filtered,
                 highlightId = highlightId,
                 currentUserId = uiState.currentUserId,
+                onMapReady = { mapViewRef = it },
                 onMarkerClick = { territoryId ->
                     selectedTerritory = uiState.territoriesWithLocation.find { it.id == territoryId }
                 }
@@ -254,6 +302,32 @@ fun MapScreen(
                         )
                     }
                 }
+            }
+
+            // FAB: centralizar na minha localização
+            FloatingActionButton(
+                onClick = {
+                    mapViewRef?.let { mv ->
+                        val myOverlay = mv.overlays
+                            .filterIsInstance<MyLocationNewOverlay>()
+                            .firstOrNull()
+                        val loc = myOverlay?.myLocation
+                        if (loc != null) {
+                            mv.controller.animateTo(loc)
+                            mv.controller.setZoom(18.0)
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = 100.dp),
+                containerColor = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Icon(
+                    Icons.Default.MyLocation,
+                    contentDescription = "Minha localização",
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                )
             }
         }
     }
@@ -396,11 +470,17 @@ fun AllTerritoriesMap(
     territories: List<Territory>,
     onMarkerClick: (String) -> Unit,
     highlightId: String? = null,
-    currentUserId: String? = null
+    currentUserId: String? = null,
+    onMapReady: (MapView) -> Unit = {}
 ) {
     val markersMap = remember { HashMap<String, Marker>() }
     val polygonsMap = remember { HashMap<String, MutableList<Polygon>>() }
     var centeredOnHighlight by remember { mutableStateOf(false) }
+    var locationOverlay by remember { mutableStateOf<MyLocationNewOverlay?>(null) }
+
+    DisposableEffect(Unit) {
+        onDispose { locationOverlay?.disableMyLocation() }
+    }
 
     AndroidView(
         modifier = Modifier.fillMaxSize(),
@@ -411,6 +491,21 @@ fun AllTerritoriesMap(
                 setMultiTouchControls(true)
                 controller.setZoom(12.0)
                 controller.setCenter(GeoPoint(-23.5505, -46.6333))
+
+                // Overlay de localização ao vivo estilo Google Maps (ponto azul + cone direcional)
+                val myLocOverlay = GoogleMapsStyleLocationOverlay(ctx, this).apply {
+                    enableMyLocation()       // ponto azul ao vivo + bússola
+                    enableFollowLocation()   // centraliza automaticamente no início
+                }
+                overlays.add(myLocOverlay)
+                locationOverlay = myLocOverlay
+
+                // Compass overlay (bússola no canto superior direito)
+                val compass = CompassOverlay(ctx, InternalCompassOrientationProvider(ctx), this)
+                compass.enableCompass()
+                overlays.add(compass)
+
+                onMapReady(this)
             }
         },
         update = { mapView ->
@@ -706,5 +801,125 @@ fun openInGoogleMaps(context: Context, lat: Double?, lng: Double?, label: String
     } else {
         val webUri = "https://maps.google.com/?q=$lat,$lng".toUri()
         context.startActivity(Intent(Intent.ACTION_VIEW, webUri))
+    }
+}
+
+/**
+ * Overlay de localização ao vivo estilo Google Maps:
+ * - Ponto central azul vibrante com contorno branco e leve sombra
+ * - Círculo de precisão do GPS (halo suave)
+ * - Cone de visão direcional (feixe que aponta para a direção em que o usuário está olhando via bússola do aparelho)
+ */
+class GoogleMapsStyleLocationOverlay(
+    context: Context,
+    mapView: MapView
+) : org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay(GpsMyLocationProvider(context), mapView), SensorEventListener {
+
+    private val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+    private val rotationSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+        ?: sensorManager?.getDefaultSensor(Sensor.TYPE_ORIENTATION)
+
+    private var currentHeading: Float = 0f
+    private val rotationMatrix = FloatArray(9)
+    private val orientationVals = FloatArray(3)
+
+    private val accuracyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.argb(35, 66, 133, 244)
+        style = Paint.Style.FILL
+    }
+    private val accuracyBorderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.argb(90, 66, 133, 244)
+        style = Paint.Style.STROKE
+        strokeWidth = 2f
+    }
+    private val whiteHaloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.WHITE
+        style = Paint.Style.FILL
+        setShadowLayer(8f, 0f, 2f, AndroidColor.argb(70, 0, 0, 0))
+    }
+    private val blueDotPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.rgb(66, 133, 244)
+        style = Paint.Style.FILL
+    }
+
+    override fun enableMyLocation(): Boolean {
+        rotationSensor?.let {
+            sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
+        }
+        return super.enableMyLocation()
+    }
+
+    override fun disableMyLocation() {
+        sensorManager?.unregisterListener(this)
+        super.disableMyLocation()
+    }
+
+    override fun onSensorChanged(event: SensorEvent?) {
+        if (event == null) return
+        if (event.sensor.type == Sensor.TYPE_ROTATION_VECTOR) {
+            SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
+            SensorManager.getOrientation(rotationMatrix, orientationVals)
+            val azimuth = Math.toDegrees(orientationVals[0].toDouble()).toFloat()
+            currentHeading = (azimuth + 360f) % 360f
+            mMapView.postInvalidate()
+        } else if (event.sensor.type == Sensor.TYPE_ORIENTATION) {
+            currentHeading = (event.values[0] + 360f) % 360f
+            mMapView.postInvalidate()
+        }
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+
+    override fun drawMyLocation(canvas: Canvas, pj: Projection, lastFix: Location) {
+        val screenPt = Point()
+        pj.toPixels(GeoPoint(lastFix.latitude, lastFix.longitude), screenPt)
+        val cx = screenPt.x.toFloat()
+        val cy = screenPt.y.toFloat()
+
+        // 1. Círculo de precisão do GPS (halo suave azul)
+        if (lastFix.hasAccuracy() && lastFix.accuracy > 0) {
+            val radiusPx = pj.metersToEquatorPixels(lastFix.accuracy)
+            if (radiusPx > 12f && radiusPx < 1200f) {
+                canvas.drawCircle(cx, cy, radiusPx, accuracyPaint)
+                canvas.drawCircle(cx, cy, radiusPx, accuracyBorderPaint)
+            }
+        }
+
+        // 2. Cone de visão direcional (feixe estilo Google Maps)
+        val heading = if (currentHeading != 0f) currentHeading else if (lastFix.hasBearing()) lastFix.bearing else 0f
+        val coneRadius = 90f
+        val sweepAngle = 55f
+        val startAngle = heading - (sweepAngle / 2f) - 90f
+
+        val conePath = Path().apply {
+            moveTo(cx, cy)
+            arcTo(
+                RectF(cx - coneRadius, cy - coneRadius, cx + coneRadius, cy + coneRadius),
+                startAngle,
+                sweepAngle
+            )
+            close()
+        }
+
+        val conePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = RadialGradient(
+                cx, cy, coneRadius,
+                intArrayOf(
+                    AndroidColor.argb(140, 66, 133, 244),
+                    AndroidColor.argb(45, 66, 133, 244),
+                    AndroidColor.TRANSPARENT
+                ),
+                floatArrayOf(0f, 0.60f, 1f),
+                Shader.TileMode.CLAMP
+            )
+            style = Paint.Style.FILL
+        }
+        canvas.drawPath(conePath, conePaint)
+
+        // 3. Ponto branco externo com sombra suave
+        canvas.drawCircle(cx, cy, 18f, whiteHaloPaint)
+
+        // 4. Ponto azul central (Google Maps)
+        canvas.drawCircle(cx, cy, 12f, blueDotPaint)
     }
 }

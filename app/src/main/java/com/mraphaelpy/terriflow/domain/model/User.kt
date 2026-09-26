@@ -12,5 +12,6 @@ data class User(
     val createdAt: Date = Date(),
     val active: Boolean = true,
     val photoUrl: String? = null,
-    val fcmTokens: List<String> = emptyList()
+    val fcmTokens: List<String> = emptyList(),
+    val congregationId: String = ""
 )

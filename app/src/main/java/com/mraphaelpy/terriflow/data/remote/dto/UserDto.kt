@@ -13,7 +13,8 @@ data class UserDto(
     val createdAt: Timestamp = Timestamp.now(),
     val active: Boolean = true,
     val photoUrl: String? = null,
-    val fcmTokens: List<String> = emptyList()
+    val fcmTokens: List<String> = emptyList(),
+    val congregationId: String = ""
 ) {
     fun toDomain() = User(
         id = id,
@@ -23,7 +24,8 @@ data class UserDto(
         createdAt = createdAt.toDate(),
         active = active,
         photoUrl = photoUrl,
-        fcmTokens = fcmTokens
+        fcmTokens = fcmTokens,
+        congregationId = congregationId
     )
 
     fun toMap() = mapOf(
@@ -33,7 +35,8 @@ data class UserDto(
         "createdAt" to createdAt,
         "active" to active,
         "photoUrl" to photoUrl,
-        "fcmTokens" to fcmTokens
+        "fcmTokens" to fcmTokens,
+        "congregationId" to congregationId
     )
 
     companion object {
@@ -48,7 +51,8 @@ data class UserDto(
                 active = doc.getBoolean("active") ?: true,
                 photoUrl = doc.getString("photoUrl"),
                 fcmTokens = (doc.get("fcmTokens") as? List<*>)
-                    ?.filterIsInstance<String>() ?: emptyList()
+                    ?.filterIsInstance<String>() ?: emptyList(),
+                congregationId = doc.getString("congregationId") ?: ""
             )
         }
 
@@ -61,7 +65,8 @@ data class UserDto(
                 createdAt = Timestamp(user.createdAt),
                 active = user.active,
                 photoUrl = user.photoUrl,
-                fcmTokens = user.fcmTokens
+                fcmTokens = user.fcmTokens,
+                congregationId = user.congregationId
             )
         }
     }

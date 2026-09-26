@@ -10,6 +10,7 @@ import com.mraphaelpy.terriflow.data.remote.source.FirestoreEventSource
 import com.mraphaelpy.terriflow.data.remote.source.FirestoreNotificationSource
 import com.mraphaelpy.terriflow.data.remote.source.FirestoreTerritorySource
 import com.mraphaelpy.terriflow.domain.repository.AuthRepository
+import com.mraphaelpy.terriflow.domain.repository.CongregationRepository
 import com.mraphaelpy.terriflow.notification.LocalNotificationHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,6 +24,7 @@ import javax.inject.Singleton
 @Singleton
 class RealtimeSyncManager @Inject constructor(
     private val authRepository: AuthRepository,
+    private val congregationRepository: CongregationRepository,
     private val territoryDao: TerritoryDao,
     private val notificationDao: NotificationDao,
     private val eventDao: TerritoryEventDao,
@@ -38,7 +40,10 @@ class RealtimeSyncManager @Inject constructor(
             authRepository.observeCurrentUser().collectLatest { user ->
                 if (user == null) return@collectLatest
 
-                val territoryFlow = territoryRemoteSource.observeAll()
+                val congregationId = congregationRepository.getCurrentCongregationId()
+                    ?: return@collectLatest
+
+                val territoryFlow = territoryRemoteSource.observeAll(congregationId)
 
                 supervisorScope {
                     launch {
@@ -65,7 +70,7 @@ class RealtimeSyncManager @Inject constructor(
 
                     launch {
                         runCatching {
-                            notificationRemoteSource.observeByUser(user.id).collect { notifications ->
+                            notificationRemoteSource.observeByUser(congregationId, user.id).collect { notifications ->
                                 notifications.forEach { notification ->
                                     val existing = notificationDao.getById(notification.id)
                                     if (existing == null) {
@@ -83,7 +88,7 @@ class RealtimeSyncManager @Inject constructor(
 
                     launch {
                         runCatching {
-                            eventRemoteSource.observeRecentGlobal(50).collect { dtos ->
+                            eventRemoteSource.observeRecentGlobal(congregationId, 50).collect { dtos ->
                                 val entities = dtos.map {
                                     TerritoryEventEntity.fromDomain(it.toDomain(), synced = true)
                                 }

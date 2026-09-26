@@ -15,10 +15,11 @@ import javax.inject.Singleton
 class FirestoreTerritorySource @Inject constructor(
     private val firestore: FirebaseFirestore
 ) {
-    private val territoriesCollection = firestore.collection("territories")
+    private fun territoriesCollection(congregationId: String) =
+        firestore.collection("congregations").document(congregationId).collection("territories")
 
-    fun observeAll(): Flow<List<TerritoryDto>> = callbackFlow {
-        val sub = territoriesCollection
+    fun observeAll(congregationId: String): Flow<List<TerritoryDto>> = callbackFlow {
+        val sub = territoriesCollection(congregationId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) { close(error); return@addSnapshotListener }
                 val list = snapshot?.documents
@@ -28,8 +29,8 @@ class FirestoreTerritorySource @Inject constructor(
         awaitClose { sub.remove() }
     }
 
-    fun observeByResponsible(responsibleId: String): Flow<List<TerritoryDto>> = callbackFlow {
-        val sub = territoriesCollection
+    fun observeByResponsible(congregationId: String, responsibleId: String): Flow<List<TerritoryDto>> = callbackFlow {
+        val sub = territoriesCollection(congregationId)
             .whereEqualTo("currentResponsibleId", responsibleId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) { close(error); return@addSnapshotListener }
@@ -40,13 +41,13 @@ class FirestoreTerritorySource @Inject constructor(
         awaitClose { sub.remove() }
     }
 
-    suspend fun getById(id: String): TerritoryDto? {
-        val doc = territoriesCollection.document(id).get().await()
+    suspend fun getById(congregationId: String, id: String): TerritoryDto? {
+        val doc = territoriesCollection(congregationId).document(id).get().await()
         return TerritoryDto.fromDocument(doc)
     }
 
-    suspend fun getByCode(code: String): TerritoryDto? {
-        val snapshot = territoriesCollection
+    suspend fun getByCode(congregationId: String, code: String): TerritoryDto? {
+        val snapshot = territoriesCollection(congregationId)
             .whereEqualTo("code", code)
             .limit(1)
             .get()
@@ -54,13 +55,17 @@ class FirestoreTerritorySource @Inject constructor(
         return snapshot.documents.firstOrNull()?.let { TerritoryDto.fromDocument(it) }
     }
 
-    suspend fun upsert(territory: Territory, syncVersion: Long = 0L) {
+    suspend fun upsert(congregationId: String, territory: Territory, syncVersion: Long = 0L) {
         val dto = TerritoryDto.fromDomain(territory, syncVersion)
-        territoriesCollection.document(territory.id).set(dto.toMap(), SetOptions.merge()).await()
+        territoriesCollection(congregationId).document(territory.id).set(dto.toMap(), SetOptions.merge()).await()
     }
 
-    suspend fun getNextCode(): String {
-        val snapshot = territoriesCollection
+    suspend fun delete(congregationId: String, id: String) {
+        territoriesCollection(congregationId).document(id).delete().await()
+    }
+
+    suspend fun getNextCode(congregationId: String): String {
+        val snapshot = territoriesCollection(congregationId)
             .orderBy("code", com.google.firebase.firestore.Query.Direction.DESCENDING)
             .limit(1)
             .get()
@@ -70,11 +75,16 @@ class FirestoreTerritorySource @Inject constructor(
         return "T-%05d".format(number + 1)
     }
 
-    suspend fun getAllSince(timestamp: com.google.firebase.Timestamp): List<TerritoryDto> {
-        val snapshot = territoriesCollection
+    suspend fun getAllSince(congregationId: String, timestamp: com.google.firebase.Timestamp): List<TerritoryDto> {
+        val snapshot = territoriesCollection(congregationId)
             .whereGreaterThan("updatedAt", timestamp)
             .get()
             .await()
+        return snapshot.documents.mapNotNull { TerritoryDto.fromDocument(it) }
+    }
+
+    suspend fun getAll(congregationId: String): List<TerritoryDto> {
+        val snapshot = territoriesCollection(congregationId).get().await()
         return snapshot.documents.mapNotNull { TerritoryDto.fromDocument(it) }
     }
 }
