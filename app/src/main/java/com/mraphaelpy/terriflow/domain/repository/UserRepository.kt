@@ -9,5 +9,6 @@ interface UserRepository {
     fun observeResponsibles(): Flow<List<User>>
     suspend fun getById(id: String): User?
     suspend fun save(user: User)
+    suspend fun updateUserName(userId: String, newName: String)
     suspend fun syncFromRemote()
 }

@@ -16,5 +16,6 @@ interface AuthRepository {
     suspend fun sendPasswordReset(email: String)
     suspend fun updateFcmToken(token: String)
     suspend fun updatePhotoUrl(photoUrl: String)
+    suspend fun updateName(name: String)
     suspend fun resolveAndSaveCongregationId(): String?
 }

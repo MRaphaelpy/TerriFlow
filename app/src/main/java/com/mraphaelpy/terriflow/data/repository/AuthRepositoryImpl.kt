@@ -152,6 +152,26 @@ class AuthRepositoryImpl @Inject constructor(
         userDao.upsert(UserEntity.fromDomain(updatedUser, synced = true))
     }
 
+    override suspend fun updateName(name: String) {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return
+        val uid = currentUserId ?: return
+        val user = getCurrentUser() ?: return
+        val congregationId = congregationRepository.getCurrentCongregationId() ?: return
+
+        runCatching {
+            val req = com.google.firebase.auth.UserProfileChangeRequest.Builder()
+                .setDisplayName(trimmed)
+                .build()
+            auth.currentUser?.updateProfile(req)?.await()
+        }
+
+        val updatedUser = user.copy(name = trimmed)
+        remoteSource.upsert(congregationId, updatedUser)
+        userDao.upsert(UserEntity.fromDomain(updatedUser, synced = true))
+        appDatabase.territoryDao().updateResponsibleName(uid, trimmed)
+    }
+
     override suspend fun resolveAndSaveCongregationId(): String? {
         val uid = currentUserId ?: return null
         // Check local cache first

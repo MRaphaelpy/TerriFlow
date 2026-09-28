@@ -80,4 +80,7 @@ interface TerritoryDao {
 
     @Query("SELECT COUNT(*) FROM territories WHERE deletedAt IS NULL")
     fun countAll(): Flow<Int>
+
+    @Query("UPDATE territories SET currentResponsibleName = :newName WHERE currentResponsibleId = :userId")
+    suspend fun updateResponsibleName(userId: String, newName: String)
 }

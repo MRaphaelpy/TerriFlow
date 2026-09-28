@@ -35,14 +35,19 @@ import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -82,6 +87,7 @@ fun DashboardScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     var showLogoutDialog by remember { mutableStateOf(false) }
+    var showEditNameDialog by remember { mutableStateOf(false) }
     
     val context = androidx.compose.ui.platform.LocalContext.current
     val photoPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -110,6 +116,69 @@ fun DashboardScreen(
 
     if (uiState.isLoggingOut) {
         LoadingDialog("Saindo com segurança...")
+    }
+
+    if (showEditNameDialog && uiState.currentUser != null) {
+        val user = uiState.currentUser!!
+        var tempName by remember { mutableStateOf(user.name) }
+        var isError by remember { mutableStateOf(false) }
+
+        AlertDialog(
+            onDismissRequest = { showEditNameDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = { Text("Editar Meu Nome") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Altere o seu nome de exibição no aplicativo:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    OutlinedTextField(
+                        value = tempName,
+                        onValueChange = {
+                            tempName = it
+                            isError = it.isBlank()
+                        },
+                        label = { Text("Nome completo") },
+                        singleLine = true,
+                        isError = isError,
+                        supportingText = {
+                            if (isError) Text("O nome não pode ficar vazio")
+                        },
+                        shape = MaterialTheme.shapes.medium,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (tempName.isNotBlank()) {
+                            viewModel.updateMyName(tempName)
+                            showEditNameDialog = false
+                        } else {
+                            isError = true
+                        }
+                    },
+                    enabled = tempName.isNotBlank() && tempName.trim() != user.name
+                ) {
+                    Text("Salvar")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showEditNameDialog = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 
     Scaffold(
@@ -166,12 +235,25 @@ fun DashboardScreen(
                             }
                         )
                         Spacer(modifier = Modifier.width(16.dp))
-                        Column {
-                            Text(
-                                text = "Olá, ${user.name}",
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Bold
-                            )
+                        Column(
+                            modifier = Modifier.clickable { showEditNameDialog = true }
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = "Olá, ${user.name}",
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = "Editar nome",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                             Text(
                                 text = if (uiState.isAdmin) "Administrador" else "Responsável",
                                 style = MaterialTheme.typography.bodyMedium,

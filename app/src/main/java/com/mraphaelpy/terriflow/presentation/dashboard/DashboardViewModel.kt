@@ -173,4 +173,10 @@ class DashboardViewModel @Inject constructor(
             }
         }
     }
+
+    fun updateMyName(newName: String) {
+        viewModelScope.launch {
+            authRepository.updateName(newName)
+        }
+    }
 }

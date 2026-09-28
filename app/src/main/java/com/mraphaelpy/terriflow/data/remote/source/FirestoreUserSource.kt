@@ -57,8 +57,11 @@ class FirestoreUserSource @Inject constructor(
     suspend fun upsert(congregationId: String, user: User) {
         val dto = UserDto.fromDomain(user)
         congregationUsersCollection(congregationId).document(user.id).set(dto.toMap(), SetOptions.merge()).await()
-        // Keep global pointer up to date
-        saveGlobalPointer(user.id, congregationId)
+        // Keep global pointer up to date only for the current user (avoids PERMISSION_DENIED when admin updates another user)
+        val currentUid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+        if (currentUid != null && currentUid == user.id) {
+            runCatching { saveGlobalPointer(user.id, congregationId) }
+        }
     }
 
     suspend fun addFcmToken(congregationId: String, userId: String, token: String) {

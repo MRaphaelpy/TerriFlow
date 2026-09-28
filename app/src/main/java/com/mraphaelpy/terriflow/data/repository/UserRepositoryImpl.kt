@@ -1,6 +1,7 @@
 package com.mraphaelpy.terriflow.data.repository
 
 import com.google.firebase.firestore.FirebaseFirestore
+import com.mraphaelpy.terriflow.data.local.dao.TerritoryDao
 import com.mraphaelpy.terriflow.data.local.dao.UserDao
 import com.mraphaelpy.terriflow.data.local.entity.UserEntity
 import com.mraphaelpy.terriflow.data.remote.dto.UserDto
@@ -17,6 +18,7 @@ import javax.inject.Singleton
 @Singleton
 class UserRepositoryImpl @Inject constructor(
     private val userDao: UserDao,
+    private val territoryDao: TerritoryDao,
     private val remoteSource: FirestoreUserSource,
     private val firestore: FirebaseFirestore,
     private val congregationRepository: CongregationRepository
@@ -36,9 +38,18 @@ class UserRepositoryImpl @Inject constructor(
 
     override suspend fun save(user: User) {
         userDao.upsert(UserEntity.fromDomain(user, synced = false))
+        territoryDao.updateResponsibleName(user.id, user.name)
         val congregationId = congregationRepository.getCurrentCongregationId() ?: return
         runCatching { remoteSource.upsert(congregationId, user) }
             .onSuccess { userDao.markSynced(user.id) }
+    }
+
+    override suspend fun updateUserName(userId: String, newName: String) {
+        val trimmed = newName.trim()
+        if (trimmed.isEmpty()) return
+        val current = getById(userId) ?: return
+        val updated = current.copy(name = trimmed)
+        save(updated)
     }
 
     override suspend fun syncFromRemote() {
