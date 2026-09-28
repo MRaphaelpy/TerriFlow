@@ -473,11 +473,20 @@ fun AllTerritoriesMap(
 ) {
     val markersMap = remember { HashMap<String, Marker>() }
     val polygonsMap = remember { HashMap<String, MutableList<Polygon>>() }
+    val iconCache = remember { HashMap<String, android.graphics.drawable.Drawable>() }
     var centeredOnHighlight by remember { mutableStateOf(false) }
-    var locationOverlay by remember { mutableStateOf<MyLocationNewOverlay?>(null) }
+    var centeredInitial by remember { mutableStateOf(false) }
+    var locationOverlay by remember { mutableStateOf<GoogleMapsStyleLocationOverlay?>(null) }
+    var compassOverlay by remember { mutableStateOf<CompassOverlay?>(null) }
+    var internalMapView by remember { mutableStateOf<MapView?>(null) }
 
     DisposableEffect(Unit) {
-        onDispose { locationOverlay?.disableMyLocation() }
+        onDispose {
+            locationOverlay?.disableMyLocation()
+            compassOverlay?.disableCompass()
+            internalMapView?.onPause()
+            internalMapView?.onDetach()
+        }
     }
 
     AndroidView(
@@ -485,6 +494,7 @@ fun AllTerritoriesMap(
         factory = { ctx ->
             Configuration.getInstance().userAgentValue = ctx.packageName
             MapView(ctx).apply {
+                internalMapView = this
                 setTileSource(TileSourceFactory.MAPNIK)
                 setMultiTouchControls(true)
                 controller.setZoom(12.0)
@@ -502,6 +512,7 @@ fun AllTerritoriesMap(
                 val compass = CompassOverlay(ctx, InternalCompassOrientationProvider(ctx), this)
                 compass.enableCompass()
                 overlays.add(compass)
+                compassOverlay = compass
 
                 onMapReady(this)
             }
@@ -605,10 +616,13 @@ fun AllTerritoriesMap(
 
                 if (lat != null && lng != null) {
                     val geoPoint = GeoPoint(lat, lng)
-                    val markerIcon = when {
-                        isHighlighted -> createStatusMarkerIcon(context, color, territory.code, territory.currentResponsibleName, scale = 1.4f, showStar = true)
-                        isMine        -> createStatusMarkerIcon(context, color, territory.code, territory.currentResponsibleName, scale = 1.2f, showStar = false)
-                        else          -> createStatusMarkerIcon(context, color, territory.code, territory.currentResponsibleName, scale = 1.0f, showStar = false)
+                    val iconKey = "${territory.id}_${territory.code}_${territory.status.name}_${color}_${territory.currentResponsibleName.orEmpty()}_${isHighlighted}_$isMine"
+                    val markerIcon = iconCache.getOrPut(iconKey) {
+                        when {
+                            isHighlighted -> createStatusMarkerIcon(context, color, territory.code, territory.currentResponsibleName, scale = 1.4f, showStar = true)
+                            isMine        -> createStatusMarkerIcon(context, color, territory.code, territory.currentResponsibleName, scale = 1.2f, showStar = false)
+                            else          -> createStatusMarkerIcon(context, color, territory.code, territory.currentResponsibleName, scale = 1.0f, showStar = false)
+                        }
                     }
 
                     val existing = markersMap[territory.id]
@@ -642,6 +656,7 @@ fun AllTerritoriesMap(
             if (highlightId != null && !centeredOnHighlight) {
                 val t = territories.find { it.id == highlightId }
                 if (t != null) {
+                    centeredOnHighlight = true
                     val allPts = t.blockPolygons.flatten()
                     val lat = t.latitude ?: t.boundaryPoints.firstOrNull()?.lat ?: allPts.firstOrNull()?.lat
                     val lng = t.longitude ?: t.boundaryPoints.firstOrNull()?.lng ?: allPts.firstOrNull()?.lng
@@ -653,10 +668,9 @@ fun AllTerritoriesMap(
                             mapView.controller.animateTo(GeoPoint(lat, lng))
                             mapView.controller.setZoom(17.0)
                         }
-                        centeredOnHighlight = true
                     }
                 }
-            } else if (highlightId == null) {
+            } else if (highlightId == null && !centeredInitial) {
                 val allLats = territories.mapNotNull { it.latitude } +
                     territories.flatMap { it.boundaryPoints.map { bp -> bp.lat } } +
                     territories.flatMap { t -> t.blockPolygons.flatten().map { it.lat } }
@@ -664,6 +678,7 @@ fun AllTerritoriesMap(
                     territories.flatMap { it.boundaryPoints.map { bp -> bp.lng } } +
                     territories.flatMap { t -> t.blockPolygons.flatten().map { it.lng } }
                 if (allLats.isNotEmpty() && allLngs.isNotEmpty()) {
+                    centeredInitial = true
                     runCatching {
                         val box = BoundingBox(allLats.max(), allLngs.max(), allLats.min(), allLngs.min())
                         mapView.post { mapView.zoomToBoundingBox(box.increaseByScale(1.3f), true) }
@@ -818,6 +833,7 @@ class GoogleMapsStyleLocationOverlay(
         ?: sensorManager?.getDefaultSensor(Sensor.TYPE_ORIENTATION)
 
     private var currentHeading: Float = 0f
+    private var lastHeadingTime: Long = 0L
     private val rotationMatrix = FloatArray(9)
     private val orientationVals = FloatArray(3)
 
@@ -842,7 +858,7 @@ class GoogleMapsStyleLocationOverlay(
 
     override fun enableMyLocation(): Boolean {
         rotationSensor?.let {
-            sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_UI)
+            sensorManager?.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
         }
         return super.enableMyLocation()
     }
@@ -854,14 +870,24 @@ class GoogleMapsStyleLocationOverlay(
 
     override fun onSensorChanged(event: SensorEvent?) {
         if (event == null) return
+        val now = System.currentTimeMillis()
+        if (now - lastHeadingTime < 80) return
+
+        val newHeading: Float
         if (event.sensor.type == Sensor.TYPE_ROTATION_VECTOR) {
             SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
             SensorManager.getOrientation(rotationMatrix, orientationVals)
             val azimuth = Math.toDegrees(orientationVals[0].toDouble()).toFloat()
-            currentHeading = (azimuth + 360f) % 360f
-            mMapView.postInvalidate()
+            newHeading = (azimuth + 360f) % 360f
         } else if (event.sensor.type == Sensor.TYPE_ORIENTATION) {
-            currentHeading = (event.values[0] + 360f) % 360f
+            newHeading = (event.values[0] + 360f) % 360f
+        } else {
+            return
+        }
+
+        if (kotlin.math.abs(newHeading - currentHeading) > 2.0f) {
+            currentHeading = newHeading
+            lastHeadingTime = now
             mMapView.postInvalidate()
         }
     }

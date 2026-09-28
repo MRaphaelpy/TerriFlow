@@ -65,6 +65,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -966,6 +967,15 @@ private fun TerritoryMiniMap(
     val hasBoundary = boundaryPoints.size >= 3
     val hasBlocks = blockPolygons.isNotEmpty()
     var showBlocks by remember { mutableStateOf(hasBlocks) }
+    var initialZoomDone by remember { mutableStateOf(false) }
+    var detailMapView by remember { mutableStateOf<MapView?>(null) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            detailMapView?.onPause()
+            detailMapView?.onDetach()
+        }
+    }
 
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
@@ -977,6 +987,7 @@ private fun TerritoryMiniMap(
             factory = { ctx ->
                 Configuration.getInstance().userAgentValue = ctx.packageName
                 MapView(ctx).apply {
+                    detailMapView = this
                     setTileSource(TileSourceFactory.MAPNIK)
                     setMultiTouchControls(true)
                     val centerLat = lat ?: boundaryPoints.firstOrNull()?.lat
@@ -1035,17 +1046,21 @@ private fun TerritoryMiniMap(
                     mapView.overlays.add(0, poly)
                 }
 
-                if (zoomPoints.size >= 2) {
-                    val bbox = BoundingBox(
-                        zoomPoints.maxOf { it.lat },
-                        zoomPoints.maxOf { it.lng },
-                        zoomPoints.minOf { it.lat },
-                        zoomPoints.minOf { it.lng }
-                    )
-                    mapView.post { mapView.zoomToBoundingBox(bbox, false, 60) }
-                } else if (hasLocation && lat != null && lng != null) {
-                    mapView.controller.setZoom(17.0)
-                    mapView.controller.setCenter(GeoPoint(lat, lng))
+                if (!initialZoomDone) {
+                    if (zoomPoints.size >= 2) {
+                        initialZoomDone = true
+                        val bbox = BoundingBox(
+                            zoomPoints.maxOf { it.lat },
+                            zoomPoints.maxOf { it.lng },
+                            zoomPoints.minOf { it.lat },
+                            zoomPoints.minOf { it.lng }
+                        )
+                        mapView.post { mapView.zoomToBoundingBox(bbox, false, 60) }
+                    } else if (hasLocation && lat != null && lng != null) {
+                        initialZoomDone = true
+                        mapView.controller.setZoom(17.0)
+                        mapView.controller.setCenter(GeoPoint(lat, lng))
+                    }
                 }
 
                 mapView.invalidate()
