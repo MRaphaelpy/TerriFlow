@@ -182,7 +182,7 @@ fun UpdateDialog(
                             modifier = Modifier.weight(1f),
                             shape = MaterialTheme.shapes.medium
                         ) {
-                            Text("Mais tarde")
+                            Text("Depois")
                         }
 
                         Button(
