@@ -11,6 +11,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequest
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkerParameters
+import com.mraphaelpy.terriflow.domain.repository.NotificationRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryEventRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
 import com.mraphaelpy.terriflow.domain.repository.UserRepository
@@ -24,7 +25,8 @@ class SyncWorker @AssistedInject constructor(
     @Assisted workerParams: WorkerParameters,
     private val territoryRepository: TerritoryRepository,
     private val eventRepository: TerritoryEventRepository,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val notificationRepository: NotificationRepository
 ) : CoroutineWorker(context, workerParams) {
 
     override suspend fun doWork(): Result {
@@ -33,6 +35,7 @@ class SyncWorker @AssistedInject constructor(
             territoryRepository.syncPendingToRemote()
             territoryRepository.syncFromRemote()
             eventRepository.syncPendingToRemote()
+            notificationRepository.syncFromRemote()
         }.fold(
             onSuccess = { Result.success() },
             onFailure = {

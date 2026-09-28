@@ -64,6 +64,9 @@ class DashboardViewModel @Inject constructor(
             runCatching {
                 territoryRepository.syncFromRemote()
             }
+            runCatching {
+                notificationRepository.syncFromRemote()
+            }
         }
     }
 
@@ -72,6 +75,9 @@ class DashboardViewModel @Inject constructor(
             _uiState.update { it.copy(isRefreshing = true) }
             runCatching {
                 territoryRepository.syncFromRemote()
+            }
+            runCatching {
+                notificationRepository.syncFromRemote()
             }
             _uiState.update { it.copy(isRefreshing = false) }
         }

@@ -5,8 +5,9 @@ import kotlinx.coroutines.flow.Flow
 
 interface NotificationRepository {
     fun observeByUser(userId: String): Flow<List<AppNotification>>
-    fun countUnread(userId: String): Flow<Int>
+    fun countUnread(userId: String = ""): Flow<Int>
+    suspend fun syncFromRemote()
     suspend fun save(notification: AppNotification)
     suspend fun markRead(id: String)
-    suspend fun markAllRead(userId: String)
+    suspend fun markAllRead(userId: String = "")
 }

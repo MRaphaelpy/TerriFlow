@@ -1,5 +1,6 @@
 package com.mraphaelpy.terriflow.data.repository
 
+import android.util.Log
 import com.mraphaelpy.terriflow.data.local.dao.NotificationDao
 import com.mraphaelpy.terriflow.data.local.entity.NotificationEntity
 import com.mraphaelpy.terriflow.data.remote.source.FirestoreNotificationSource
@@ -19,10 +20,21 @@ class NotificationRepositoryImpl @Inject constructor(
 ) : NotificationRepository {
 
     override fun observeByUser(userId: String): Flow<List<AppNotification>> =
-        notificationDao.observeByUser(userId).map { list -> list.map { it.toDomain() } }
+        notificationDao.observeAll().map { list -> list.map { it.toDomain() } }
 
     override fun countUnread(userId: String): Flow<Int> =
-        notificationDao.countUnread(userId)
+        notificationDao.countUnread()
+
+    override suspend fun syncFromRemote() {
+        val congregationId = congregationRepository.getCurrentCongregationId() ?: return
+        runCatching {
+            val remoteNotifications = remoteSource.getAll(congregationId)
+            val entities = remoteNotifications.map { NotificationEntity.fromDomain(it) }
+            notificationDao.insertAll(entities)
+        }.onFailure {
+            Log.e("NotificationRepositoryImpl", "Error syncing notifications from remote", it)
+        }
+    }
 
     override suspend fun save(notification: AppNotification) {
         notificationDao.insert(NotificationEntity.fromDomain(notification))
@@ -35,6 +47,6 @@ class NotificationRepositoryImpl @Inject constructor(
     }
 
     override suspend fun markAllRead(userId: String) {
-        notificationDao.markAllRead(userId)
+        notificationDao.markAllRead()
     }
 }

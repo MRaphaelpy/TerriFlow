@@ -47,7 +47,19 @@ class CompleteTerritoryUseCase @Inject constructor(
         )
         eventRepository.save(completedEvent)
 
-        if (nextResponsibleId != null) {
+        if (nextResponsibleId == null) {
+            val notification = AppNotification(
+                id = UUID.randomUUID().toString(),
+                userId = "",
+                title = "Território finalizado",
+                body = "${territory.code} — ${territory.name} foi finalizado por ${user.name}",
+                type = NotificationType.TERRITORY_COMPLETED,
+                territoryId = territory.id,
+                territoryCode = territory.code,
+                createdAt = now
+            )
+            notificationRepository.save(notification)
+        } else {
             val nextResponsible = userRepository.getById(nextResponsibleId)
             if (nextResponsible != null) {
                 val transferred = updated.copy(

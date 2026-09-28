@@ -27,6 +27,10 @@ class NotificationsViewModel @Inject constructor(
     val uiState: StateFlow<NotificationsUiState> = _uiState.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            runCatching { notificationRepository.syncFromRemote() }
+        }
+
         val userId = authRepository.currentUserId
 
         if (userId != null) {
