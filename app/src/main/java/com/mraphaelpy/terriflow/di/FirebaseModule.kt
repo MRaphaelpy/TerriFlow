@@ -3,7 +3,6 @@ package com.mraphaelpy.terriflow.di
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.firestoreSettings
-import com.google.firebase.firestore.memoryCacheSettings
 import com.google.firebase.firestore.persistentCacheSettings
 import com.google.firebase.messaging.FirebaseMessaging
 import dagger.Module

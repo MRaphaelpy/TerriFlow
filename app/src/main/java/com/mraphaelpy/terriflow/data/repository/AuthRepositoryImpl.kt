@@ -2,6 +2,7 @@ package com.mraphaelpy.terriflow.data.repository
 
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.messaging.FirebaseMessaging
+import com.mraphaelpy.terriflow.data.local.AppDatabase
 import com.mraphaelpy.terriflow.data.local.dao.UserDao
 import com.mraphaelpy.terriflow.data.local.entity.UserEntity
 import com.mraphaelpy.terriflow.data.remote.source.FirestoreUserSource
@@ -9,12 +10,11 @@ import com.mraphaelpy.terriflow.domain.model.User
 import com.mraphaelpy.terriflow.domain.model.UserRole
 import com.mraphaelpy.terriflow.domain.repository.AuthRepository
 import com.mraphaelpy.terriflow.domain.repository.CongregationRepository
-import com.mraphaelpy.terriflow.data.local.AppDatabase
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withContext
 import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton

@@ -3,7 +3,10 @@ package com.mraphaelpy.terriflow.di
 import android.content.Context
 import androidx.room.Room
 import com.mraphaelpy.terriflow.data.local.AppDatabase
-import com.mraphaelpy.terriflow.data.local.dao.*
+import com.mraphaelpy.terriflow.data.local.dao.NotificationDao
+import com.mraphaelpy.terriflow.data.local.dao.TerritoryDao
+import com.mraphaelpy.terriflow.data.local.dao.TerritoryEventDao
+import com.mraphaelpy.terriflow.data.local.dao.UserDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

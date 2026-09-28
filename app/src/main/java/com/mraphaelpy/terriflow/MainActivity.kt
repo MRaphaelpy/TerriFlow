@@ -86,9 +86,9 @@ class MainActivity : ComponentActivity() {
                     var availableUpdate by remember { mutableStateOf<com.mraphaelpy.terriflow.core.updater.AppUpdateInfo?>(null) }
 
                     LaunchedEffect(Unit) {
-                        // Verifica se existe atualização disponível ao abrir o app
+                        // Verifica se existe atualização disponível ao abrir o app (apenas se o usuário não tiver adiado esta versão)
                         val updateInfo = updateManager.checkForUpdate()
-                        if (updateInfo != null && updateInfo.hasUpdate) {
+                        if (updateInfo != null && updateInfo.hasUpdate && !updateManager.isVersionDismissed(updateInfo.latestVersion)) {
                             availableUpdate = updateInfo
                         }
 
@@ -117,7 +117,10 @@ class MainActivity : ComponentActivity() {
                     availableUpdate?.let { info ->
                         com.mraphaelpy.terriflow.core.updater.UpdateDialog(
                             updateInfo = info,
-                            onDismiss = { availableUpdate = null },
+                            onDismiss = {
+                                updateManager.dismissVersion(info.latestVersion)
+                                availableUpdate = null
+                            },
                             updateManager = updateManager
                         )
                     }

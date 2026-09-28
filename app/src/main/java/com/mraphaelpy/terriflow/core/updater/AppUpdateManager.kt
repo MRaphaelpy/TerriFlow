@@ -28,6 +28,19 @@ class AppUpdateManager @Inject constructor(
         private const val RELEASES_API_URL = "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
     }
 
+    private val prefs = context.getSharedPreferences("terriflow_updater", Context.MODE_PRIVATE)
+
+    fun isVersionDismissed(version: String): Boolean {
+        val cleanVersion = version.removePrefix("v").trim()
+        val dismissed = prefs.getString("dismissed_version", null)
+        return dismissed != null && dismissed == cleanVersion
+    }
+
+    fun dismissVersion(version: String) {
+        val cleanVersion = version.removePrefix("v").trim()
+        prefs.edit().putString("dismissed_version", cleanVersion).apply()
+    }
+
     suspend fun checkForUpdate(): AppUpdateInfo? = withContext(Dispatchers.IO) {
         runCatching {
             val url = URL(RELEASES_API_URL)
@@ -66,7 +79,16 @@ class AppUpdateManager @Inject constructor(
 
             if (downloadUrl.isEmpty()) return@runCatching null
 
-            val currentVersion = BuildConfig.VERSION_NAME
+            val currentVersion = runCatching {
+                val pInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    context.packageManager.getPackageInfo(context.packageName, android.content.pm.PackageManager.PackageInfoFlags.of(0))
+                } else {
+                    @Suppress("DEPRECATION")
+                    context.packageManager.getPackageInfo(context.packageName, 0)
+                }
+                pInfo.versionName?.takeIf { it.isNotBlank() } ?: BuildConfig.VERSION_NAME
+            }.getOrDefault(BuildConfig.VERSION_NAME)
+
             val isNewer = isNewerVersion(tagName, currentVersion)
 
             AppUpdateInfo(
@@ -167,13 +189,15 @@ class AppUpdateManager @Inject constructor(
         context.startActivity(intent)
     }
 
-    private fun isNewerVersion(remoteTag: String, currentVer: String): Boolean {
+    fun isNewerVersion(remoteTag: String, currentVer: String): Boolean {
         val cleanRemote = remoteTag.removePrefix("v").trim()
         val cleanCurrent = currentVer.removePrefix("v").trim()
-        if (cleanRemote == cleanCurrent) return false
+        if (cleanRemote.equals(cleanCurrent, ignoreCase = true)) return false
 
-        val remoteParts = cleanRemote.split(".").mapNotNull { it.toIntOrNull() }
-        val currentParts = cleanCurrent.split(".").mapNotNull { it.toIntOrNull() }
+        val remoteParts = cleanRemote.split(".", "-", "_").mapNotNull { it.toIntOrNull() }
+        val currentParts = cleanCurrent.split(".", "-", "_").mapNotNull { it.toIntOrNull() }
+
+        if (remoteParts.isNotEmpty() && remoteParts == currentParts) return false
 
         val maxLen = maxOf(remoteParts.size, currentParts.size)
         for (i in 0 until maxLen) {

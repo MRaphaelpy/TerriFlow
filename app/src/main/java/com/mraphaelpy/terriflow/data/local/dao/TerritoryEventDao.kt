@@ -1,6 +1,9 @@
 package com.mraphaelpy.terriflow.data.local.dao
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
 import com.mraphaelpy.terriflow.data.local.entity.TerritoryEventEntity
 import kotlinx.coroutines.flow.Flow
 

@@ -6,8 +6,14 @@ import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.mraphaelpy.terriflow.data.local.converter.Converters
-import com.mraphaelpy.terriflow.data.local.dao.*
-import com.mraphaelpy.terriflow.data.local.entity.*
+import com.mraphaelpy.terriflow.data.local.dao.NotificationDao
+import com.mraphaelpy.terriflow.data.local.dao.TerritoryDao
+import com.mraphaelpy.terriflow.data.local.dao.TerritoryEventDao
+import com.mraphaelpy.terriflow.data.local.dao.UserDao
+import com.mraphaelpy.terriflow.data.local.entity.NotificationEntity
+import com.mraphaelpy.terriflow.data.local.entity.TerritoryEntity
+import com.mraphaelpy.terriflow.data.local.entity.TerritoryEventEntity
+import com.mraphaelpy.terriflow.data.local.entity.UserEntity
 
 @Database(
     entities = [

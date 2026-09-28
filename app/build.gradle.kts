@@ -15,8 +15,15 @@ android {
         applicationId = "com.mraphaelpy.terriflow"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        val vCode = (findProperty("versionCode") as? String)?.toIntOrNull()
+            ?: System.getenv("APP_VERSION_CODE")?.toIntOrNull()
+            ?: 4
+        val vName = (findProperty("versionName") as? String)
+            ?: System.getenv("APP_VERSION_NAME")
+            ?: "1.0.4"
+
+        versionCode = vCode
+        versionName = vName
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

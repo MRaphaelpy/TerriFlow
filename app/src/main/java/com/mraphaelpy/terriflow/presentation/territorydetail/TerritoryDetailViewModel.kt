@@ -10,9 +10,16 @@ import com.mraphaelpy.terriflow.domain.repository.AuthRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryEventRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
 import com.mraphaelpy.terriflow.domain.repository.UserRepository
-import com.mraphaelpy.terriflow.domain.usecase.territory.*
+import com.mraphaelpy.terriflow.domain.usecase.territory.AssignTerritoryUseCase
+import com.mraphaelpy.terriflow.domain.usecase.territory.CompleteTerritoryUseCase
+import com.mraphaelpy.terriflow.domain.usecase.territory.PauseTerritoryUseCase
+import com.mraphaelpy.terriflow.domain.usecase.territory.ReturnTerritoryUseCase
+import com.mraphaelpy.terriflow.domain.usecase.territory.StartTerritoryUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 

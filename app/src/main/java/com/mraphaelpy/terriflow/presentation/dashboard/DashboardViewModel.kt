@@ -2,6 +2,7 @@ package com.mraphaelpy.terriflow.presentation.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mraphaelpy.terriflow.domain.model.Territory
 import com.mraphaelpy.terriflow.domain.model.TerritoryEvent
 import com.mraphaelpy.terriflow.domain.model.TerritoryStatus
 import com.mraphaelpy.terriflow.domain.model.User
@@ -10,13 +11,16 @@ import com.mraphaelpy.terriflow.domain.repository.NotificationRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryEventRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import javax.inject.Inject
-
-import com.mraphaelpy.terriflow.domain.model.Territory
 import java.util.Date
 import java.util.concurrent.TimeUnit
+import javax.inject.Inject
 
 data class DashboardStats(
     val available: Int = 0,

@@ -2,7 +2,10 @@ package com.mraphaelpy.terriflow.sync
 
 import android.content.Context
 import androidx.hilt.work.HiltWorker
-import androidx.work.*
+import androidx.work.CoroutineWorker
+import androidx.work.PeriodicWorkRequest
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkerParameters
 import com.mraphaelpy.terriflow.domain.model.AppNotification
 import com.mraphaelpy.terriflow.domain.model.NotificationType
 import com.mraphaelpy.terriflow.domain.repository.NotificationRepository

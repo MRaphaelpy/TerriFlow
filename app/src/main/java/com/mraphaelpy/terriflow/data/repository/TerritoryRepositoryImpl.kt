@@ -4,7 +4,6 @@ import android.util.Log
 import com.google.firebase.firestore.FirebaseFirestore
 import com.mraphaelpy.terriflow.data.local.dao.TerritoryDao
 import com.mraphaelpy.terriflow.data.local.entity.TerritoryEntity
-import com.mraphaelpy.terriflow.data.remote.dto.TerritoryDto
 import com.mraphaelpy.terriflow.data.remote.source.FirestoreTerritorySource
 import com.mraphaelpy.terriflow.domain.model.Territory
 import com.mraphaelpy.terriflow.domain.model.TerritoryStatus
