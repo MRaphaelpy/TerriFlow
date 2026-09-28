@@ -20,10 +20,18 @@ class NotificationRepositoryImpl @Inject constructor(
 ) : NotificationRepository {
 
     override fun observeByUser(userId: String): Flow<List<AppNotification>> =
-        notificationDao.observeAll().map { list -> list.map { it.toDomain() } }
+        if (userId.isNotBlank()) {
+            notificationDao.observeByUser(userId).map { list -> list.map { it.toDomain() } }
+        } else {
+            notificationDao.observeAll().map { list -> list.map { it.toDomain() } }
+        }
 
     override fun countUnread(userId: String): Flow<Int> =
-        notificationDao.countUnread()
+        if (userId.isNotBlank()) {
+            notificationDao.countUnreadByUser(userId)
+        } else {
+            notificationDao.countUnread()
+        }
 
     override suspend fun syncFromRemote() {
         val congregationId = congregationRepository.getCurrentCongregationId() ?: return
@@ -47,6 +55,10 @@ class NotificationRepositoryImpl @Inject constructor(
     }
 
     override suspend fun markAllRead(userId: String) {
-        notificationDao.markAllRead()
+        if (userId.isNotBlank()) {
+            notificationDao.markAllReadByUser(userId)
+        } else {
+            notificationDao.markAllRead()
+        }
     }
 }

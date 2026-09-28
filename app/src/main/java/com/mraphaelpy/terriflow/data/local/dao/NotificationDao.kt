@@ -19,6 +19,9 @@ interface NotificationDao {
     @Query("SELECT COUNT(*) FROM notifications WHERE read = 0")
     fun countUnread(): Flow<Int>
 
+    @Query("SELECT COUNT(*) FROM notifications WHERE read = 0 AND (userId = :userId OR userId = '' OR userId = 'ALL')")
+    fun countUnreadByUser(userId: String): Flow<Int>
+
     @Query("SELECT * FROM notifications WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): NotificationEntity?
 
@@ -33,6 +36,9 @@ interface NotificationDao {
 
     @Query("UPDATE notifications SET read = 1")
     suspend fun markAllRead()
+
+    @Query("UPDATE notifications SET read = 1 WHERE userId = :userId OR userId = '' OR userId = 'ALL'")
+    suspend fun markAllReadByUser(userId: String)
 
     @Query("DELETE FROM notifications WHERE createdAt < :cutoff")
     suspend fun deleteOld(cutoff: Long)
