@@ -19,7 +19,7 @@ interface UserDao {
     @Query("SELECT * FROM users WHERE id = :id")
     suspend fun getById(id: String): UserEntity?
 
-    @Query("SELECT * FROM users WHERE role = 'RESPONSIBLE' AND active = 1 AND deletedAt IS NULL ORDER BY name ASC")
+    @Query("SELECT * FROM users WHERE active = 1 AND deletedAt IS NULL ORDER BY name ASC")
     fun observeResponsibles(): Flow<List<UserEntity>>
 
     @Query("SELECT * FROM users WHERE synced = 0")

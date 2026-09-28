@@ -5,6 +5,9 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -223,35 +226,44 @@ fun TerritoryDetailScreen(
 
         val territory = uiState.territory ?: return@Scaffold
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            item { TerritoryInfoCard(territory, onViewMap = { onNavigateToMap(territory.id) }) }
-            item {
-                TerritoryMiniMap(
-                    lat = territory.latitude,
-                    lng = territory.longitude,
-                    label = "${territory.code} — ${territory.name}",
-                    status = territory.status,
-                    boundaryPoints = territory.boundaryPoints,
-                    blockPolygons = territory.blockPolygons,
-                    onViewMap = { onNavigateToMap(territory.id) }
-                )
-            }
-            item { ActionButtons(uiState, territory, onAssign = { showAssignDialog = true }, onStart = { viewModel.start() }, onPause = { viewModel.pause() }, onComplete = { showCompleteDialog = true }, onReturn = { showReturnDialog = true }) }
+            TerritoryInfoCard(territory, onViewMap = { onNavigateToMap(territory.id) })
+            TerritoryMiniMap(
+                lat = territory.latitude,
+                lng = territory.longitude,
+                label = "${territory.code} — ${territory.name}",
+                status = territory.status,
+                boundaryPoints = territory.boundaryPoints,
+                blockPolygons = territory.blockPolygons,
+                onViewMap = { onNavigateToMap(territory.id) }
+            )
+            ActionButtons(
+                uiState,
+                territory,
+                onAssign = { showAssignDialog = true },
+                onStart = { viewModel.start() },
+                onPause = { viewModel.pause() },
+                onComplete = { showCompleteDialog = true },
+                onReturn = { showReturnDialog = true }
+            )
             if (uiState.isAdmin) {
-                item {
-                    RotationHistoryCard(
-                        pastWorkers = uiState.pastWorkers,
-                        suggestedWorkers = uiState.suggestedWorkers
-                    )
-                }
-                item {
-                    Text("Histórico (Auditoria)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                }
-                items(uiState.historyCycles) { cycle ->
+                RotationHistoryCard(
+                    pastWorkers = uiState.pastWorkers,
+                    suggestedWorkers = uiState.suggestedWorkers
+                )
+                Text(
+                    "Histórico (Auditoria)",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                uiState.historyCycles.forEach { cycle ->
                     HistoryCycleCard(cycle)
                 }
             }
@@ -977,95 +989,116 @@ private fun TerritoryMiniMap(
         }
     }
 
+    var lastDrawnKey by remember { mutableStateOf("") }
+
     ElevatedCard(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.extraLarge,
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
     ) {
-        AndroidView(
-            modifier = Modifier.fillMaxWidth().height(260.dp),
-            factory = { ctx ->
-                Configuration.getInstance().userAgentValue = ctx.packageName
-                MapView(ctx).apply {
-                    detailMapView = this
-                    setTileSource(TileSourceFactory.MAPNIK)
-                    setMultiTouchControls(true)
-                    val centerLat = lat ?: boundaryPoints.firstOrNull()?.lat
-                        ?: blockPolygons.firstOrNull()?.firstOrNull()?.lat ?: -23.5505
-                    val centerLng = lng ?: boundaryPoints.firstOrNull()?.lng
-                        ?: blockPolygons.firstOrNull()?.firstOrNull()?.lng ?: -46.6333
-                    controller.setZoom(16.0)
-                    controller.setCenter(GeoPoint(centerLat, centerLng))
-                }
-            },
-            update = { mapView ->
-                mapView.overlays.clear()
-
-                if (hasLocation && lat != null && lng != null) {
-                    val pinDrawable = android.graphics.drawable.GradientDrawable().apply {
-                        shape = android.graphics.drawable.GradientDrawable.OVAL
-                        setColor(markerColor)
-                        setSize(40, 40)
-                        setStroke(5, android.graphics.Color.WHITE)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(260.dp)
+        ) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { ctx ->
+                    Configuration.getInstance().userAgentValue = ctx.packageName
+                    MapView(ctx).apply {
+                        detailMapView = this
+                        setTileSource(TileSourceFactory.MAPNIK)
+                        setMultiTouchControls(false)
+                        isClickable = false
+                        isFocusable = false
+                        val centerLat = lat ?: boundaryPoints.firstOrNull()?.lat
+                            ?: blockPolygons.firstOrNull()?.firstOrNull()?.lat ?: -23.5505
+                        val centerLng = lng ?: boundaryPoints.firstOrNull()?.lng
+                            ?: blockPolygons.firstOrNull()?.firstOrNull()?.lng ?: -46.6333
+                        controller.setZoom(16.0)
+                        controller.setCenter(GeoPoint(centerLat, centerLng))
                     }
-                    mapView.overlays.add(Marker(mapView).apply {
-                        position = GeoPoint(lat, lng)
-                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-                        icon = pinDrawable
-                        title = label
-                    })
-                }
+                },
+                update = { mapView ->
+                    val currentKey = "$lat,$lng,$status,$showBlocks,${boundaryPoints.size},${blockPolygons.size}"
+                    if (currentKey != lastDrawnKey) {
+                        lastDrawnKey = currentKey
+                        mapView.overlays.clear()
 
-                val zoomPoints: List<com.mraphaelpy.terriflow.domain.model.LatLng> = when {
-                    showBlocks && blockPolygons.isNotEmpty() -> blockPolygons.flatten()
-                    hasBoundary -> boundaryPoints
-                    else -> emptyList()
-                }
-
-                if (showBlocks && blockPolygons.isNotEmpty()) {
-                    blockPolygons.forEach { block ->
-                        val poly = Polygon().apply {
-                            val pts = block.map { GeoPoint(it.lat, it.lng) }.toMutableList()
-                            if (pts.isNotEmpty()) pts.add(pts.first())
-                            points = pts
-                            fillPaint.color = MapColors.BLOCK_FILL
-                            outlinePaint.color = MapColors.OUTLINE
-                            outlinePaint.strokeWidth = 2f
+                        if (hasLocation && lat != null && lng != null) {
+                            val pinDrawable = android.graphics.drawable.GradientDrawable().apply {
+                                shape = android.graphics.drawable.GradientDrawable.OVAL
+                                setColor(markerColor)
+                                setSize(40, 40)
+                                setStroke(5, android.graphics.Color.WHITE)
+                            }
+                            mapView.overlays.add(Marker(mapView).apply {
+                                position = GeoPoint(lat, lng)
+                                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                                icon = pinDrawable
+                                title = label
+                            })
                         }
-                        mapView.overlays.add(0, poly)
-                    }
-                } else if (hasBoundary) {
-                    val poly = Polygon().apply {
-                        val pts = boundaryPoints.map { GeoPoint(it.lat, it.lng) }.toMutableList()
-                        pts.add(pts.first())
-                        points = pts
-                        fillPaint.color = MapColors.TERRITORY_FILL
-                        outlinePaint.color = MapColors.OUTLINE
-                        outlinePaint.strokeWidth = 3f
-                    }
-                    mapView.overlays.add(0, poly)
-                }
 
-                if (!initialZoomDone) {
-                    if (zoomPoints.size >= 2) {
-                        initialZoomDone = true
-                        val bbox = BoundingBox(
-                            zoomPoints.maxOf { it.lat },
-                            zoomPoints.maxOf { it.lng },
-                            zoomPoints.minOf { it.lat },
-                            zoomPoints.minOf { it.lng }
-                        )
-                        mapView.post { mapView.zoomToBoundingBox(bbox, false, 60) }
-                    } else if (hasLocation && lat != null && lng != null) {
-                        initialZoomDone = true
-                        mapView.controller.setZoom(17.0)
-                        mapView.controller.setCenter(GeoPoint(lat, lng))
+                        if (showBlocks && blockPolygons.isNotEmpty()) {
+                            blockPolygons.forEach { block ->
+                                val poly = Polygon().apply {
+                                    val pts = block.map { GeoPoint(it.lat, it.lng) }.toMutableList()
+                                    if (pts.isNotEmpty()) pts.add(pts.first())
+                                    points = pts
+                                    fillPaint.color = MapColors.BLOCK_FILL
+                                    outlinePaint.color = MapColors.OUTLINE
+                                    outlinePaint.strokeWidth = 2f
+                                }
+                                mapView.overlays.add(0, poly)
+                            }
+                        } else if (hasBoundary) {
+                            val poly = Polygon().apply {
+                                val pts = boundaryPoints.map { GeoPoint(it.lat, it.lng) }.toMutableList()
+                                pts.add(pts.first())
+                                points = pts
+                                fillPaint.color = MapColors.TERRITORY_FILL
+                                outlinePaint.color = MapColors.OUTLINE
+                                outlinePaint.strokeWidth = 3f
+                            }
+                            mapView.overlays.add(0, poly)
+                        }
+
+                        mapView.invalidate()
+                    }
+
+                    val zoomPoints: List<com.mraphaelpy.terriflow.domain.model.LatLng> = when {
+                        showBlocks && blockPolygons.isNotEmpty() -> blockPolygons.flatten()
+                        hasBoundary -> boundaryPoints
+                        else -> emptyList()
+                    }
+
+                    if (!initialZoomDone) {
+                        if (zoomPoints.size >= 2) {
+                            initialZoomDone = true
+                            val bbox = BoundingBox(
+                                zoomPoints.maxOf { it.lat },
+                                zoomPoints.maxOf { it.lng },
+                                zoomPoints.minOf { it.lat },
+                                zoomPoints.minOf { it.lng }
+                            )
+                            mapView.post { mapView.zoomToBoundingBox(bbox, false, 60) }
+                        } else if (hasLocation && lat != null && lng != null) {
+                            initialZoomDone = true
+                            mapView.controller.setZoom(17.0)
+                            mapView.controller.setCenter(GeoPoint(lat, lng))
+                        }
                     }
                 }
+            )
 
-                mapView.invalidate()
-            }
-        )
+            // Transparent overlay box to allow tapping to open map screen
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clickable(onClick = onViewMap)
+            )
+        }
 
         Row(
             modifier = Modifier

@@ -17,6 +17,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.mraphaelpy.terriflow.domain.model.User
 
@@ -119,9 +120,14 @@ private fun DefaultAvatar(initial: String, size: Dp, modifier: Modifier) {
         modifier = modifier.size(size)
     ) {
         Box(contentAlignment = Alignment.Center) {
+            val textStyle = when {
+                size < 24.dp -> MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp)
+                size < 36.dp -> MaterialTheme.typography.labelMedium
+                else -> MaterialTheme.typography.titleMedium
+            }
             Text(
                 text = initial,
-                style = MaterialTheme.typography.titleMedium,
+                style = textStyle,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                 fontWeight = FontWeight.Bold
             )

@@ -35,45 +35,13 @@ data class TerritoryDetailUiState(
     val currentUser: User? = null,
     val isLoading: Boolean = true,
     val error: String? = null,
-    val actionSuccess: String? = null
+    val actionSuccess: String? = null,
+    val rotationInfo: List<com.mraphaelpy.terriflow.domain.model.ResponsibleRotationInfo> = emptyList(),
+    val pastWorkers: List<com.mraphaelpy.terriflow.domain.model.ResponsibleRotationInfo> = emptyList(),
+    val suggestedWorkers: List<com.mraphaelpy.terriflow.domain.model.ResponsibleRotationInfo> = emptyList(),
+    val historyCycles: List<HistoryCycle> = emptyList()
 ) {
     val isAdmin: Boolean get() = currentUser?.role?.name == "ADMIN" || currentUser?.role?.name == "SUPER_ADMIN"
-    
-    val rotationInfo: List<com.mraphaelpy.terriflow.domain.model.ResponsibleRotationInfo> get() =
-        com.mraphaelpy.terriflow.domain.model.TerritoryRotationHelper.computeRotationInfo(responsibles, territory, events)
-
-    val pastWorkers: List<com.mraphaelpy.terriflow.domain.model.ResponsibleRotationInfo> get() =
-        rotationInfo.filter { it.hasWorkedPreviously }.sortedByDescending { it.lastAssignedDate }
-
-    val suggestedWorkers: List<com.mraphaelpy.terriflow.domain.model.ResponsibleRotationInfo> get() =
-        rotationInfo.filter { !it.hasWorkedPreviously && it.user.id != territory?.currentResponsibleId }
-
-    val historyCycles: List<HistoryCycle> get() {
-        val cycles = mutableListOf<HistoryCycle>()
-        var currentResponsible = "Sistema / Não atribuído"
-        var currentEvents = mutableListOf<TerritoryEvent>()
-
-        for (event in events.sortedBy { it.timestamp }) {
-            if (event.type == com.mraphaelpy.terriflow.domain.model.EventType.ASSIGNED) {
-                if (currentEvents.isNotEmpty()) {
-                    cycles.add(HistoryCycle(currentResponsible, currentEvents.reversed()))
-                    currentEvents = mutableListOf()
-                }
-                currentResponsible = event.extra["responsibleName"] ?: event.userName
-            } else if (event.type == com.mraphaelpy.terriflow.domain.model.EventType.TRANSFERRED) {
-                if (currentEvents.isNotEmpty()) {
-                    cycles.add(HistoryCycle(currentResponsible, currentEvents.reversed()))
-                    currentEvents = mutableListOf()
-                }
-                currentResponsible = event.extra["toUserName"] ?: event.userName
-            }
-            currentEvents.add(event)
-        }
-        if (currentEvents.isNotEmpty()) {
-            cycles.add(HistoryCycle(currentResponsible, currentEvents.reversed()))
-        }
-        return cycles.reversed()
-    }
 }
 
 @HiltViewModel
@@ -106,22 +74,74 @@ class TerritoryDetailViewModel @Inject constructor(
         }
         viewModelScope.launch {
             territoryRepository.observeById(territoryId).collect { territory ->
-                _uiState.update { it.copy(territory = territory, isLoading = false) }
+                updateStateWithCalculations(territory = territory, isLoading = false)
             }
         }
         viewModelScope.launch {
             eventRepository.observeByTerritory(territoryId).collect { events ->
-                _uiState.update { it.copy(events = events) }
+                updateStateWithCalculations(events = events)
             }
         }
         viewModelScope.launch {
             userRepository.observeResponsibles().collect { responsibles ->
-                _uiState.update { it.copy(responsibles = responsibles) }
+                updateStateWithCalculations(responsibles = responsibles)
             }
         }
         viewModelScope.launch {
             runCatching { eventRepository.syncFromRemote(territoryId) }
         }
+    }
+
+    private fun updateStateWithCalculations(
+        territory: Territory? = _uiState.value.territory,
+        events: List<TerritoryEvent> = _uiState.value.events,
+        responsibles: List<User> = _uiState.value.responsibles,
+        isLoading: Boolean = _uiState.value.isLoading
+    ) {
+        val rotation = com.mraphaelpy.terriflow.domain.model.TerritoryRotationHelper.computeRotationInfo(responsibles, territory, events)
+        val past = rotation.filter { it.hasWorkedPreviously }.sortedByDescending { it.lastAssignedDate }
+        val suggested = rotation.filter { !it.hasWorkedPreviously && it.user.id != territory?.currentResponsibleId }
+        val cycles = computeHistoryCycles(events)
+
+        _uiState.update {
+            it.copy(
+                territory = territory,
+                events = events,
+                responsibles = responsibles,
+                isLoading = isLoading,
+                rotationInfo = rotation,
+                pastWorkers = past,
+                suggestedWorkers = suggested,
+                historyCycles = cycles
+            )
+        }
+    }
+
+    private fun computeHistoryCycles(events: List<TerritoryEvent>): List<HistoryCycle> {
+        val cycles = mutableListOf<HistoryCycle>()
+        var currentResponsible = "Sistema / Não atribuído"
+        var currentEvents = mutableListOf<TerritoryEvent>()
+
+        for (event in events.sortedBy { it.timestamp }) {
+            if (event.type == com.mraphaelpy.terriflow.domain.model.EventType.ASSIGNED) {
+                if (currentEvents.isNotEmpty()) {
+                    cycles.add(HistoryCycle(currentResponsible, currentEvents.reversed()))
+                    currentEvents = mutableListOf()
+                }
+                currentResponsible = event.extra["responsibleName"] ?: event.userName
+            } else if (event.type == com.mraphaelpy.terriflow.domain.model.EventType.TRANSFERRED) {
+                if (currentEvents.isNotEmpty()) {
+                    cycles.add(HistoryCycle(currentResponsible, currentEvents.reversed()))
+                    currentEvents = mutableListOf()
+                }
+                currentResponsible = event.extra["toUserName"] ?: event.userName
+            }
+            currentEvents.add(event)
+        }
+        if (currentEvents.isNotEmpty()) {
+            cycles.add(HistoryCycle(currentResponsible, currentEvents.reversed()))
+        }
+        return cycles.reversed()
     }
 
     fun assign(responsibleId: String) = performAction {
