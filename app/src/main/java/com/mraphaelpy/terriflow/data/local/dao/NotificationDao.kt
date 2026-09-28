@@ -33,4 +33,7 @@ interface NotificationDao {
 
     @Query("DELETE FROM notifications WHERE userId = :userId AND createdAt < :cutoff")
     suspend fun deleteOld(userId: String, cutoff: Long)
+
+    @Query("DELETE FROM notifications WHERE territoryId = :territoryId")
+    suspend fun deleteByTerritory(territoryId: String)
 }

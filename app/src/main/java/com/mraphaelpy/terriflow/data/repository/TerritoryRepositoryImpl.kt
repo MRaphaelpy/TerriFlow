@@ -2,8 +2,11 @@ package com.mraphaelpy.terriflow.data.repository
 
 import android.util.Log
 import com.google.firebase.firestore.FirebaseFirestore
+import com.mraphaelpy.terriflow.data.local.dao.NotificationDao
 import com.mraphaelpy.terriflow.data.local.dao.TerritoryDao
+import com.mraphaelpy.terriflow.data.local.dao.TerritoryEventDao
 import com.mraphaelpy.terriflow.data.local.entity.TerritoryEntity
+import com.mraphaelpy.terriflow.data.remote.source.FirestoreEventSource
 import com.mraphaelpy.terriflow.data.remote.source.FirestoreTerritorySource
 import com.mraphaelpy.terriflow.domain.model.Territory
 import com.mraphaelpy.terriflow.domain.model.TerritoryStatus
@@ -19,7 +22,10 @@ import javax.inject.Singleton
 @Singleton
 class TerritoryRepositoryImpl @Inject constructor(
     private val territoryDao: TerritoryDao,
+    private val eventDao: TerritoryEventDao,
+    private val notificationDao: NotificationDao,
     private val remoteSource: FirestoreTerritorySource,
+    private val remoteEventSource: FirestoreEventSource,
     private val firestore: FirebaseFirestore,
     private val authRepository: AuthRepository,
     private val congregationRepository: CongregationRepository
@@ -104,6 +110,16 @@ class TerritoryRepositoryImpl @Inject constructor(
             val congregationId = congregationRepository.getCurrentCongregationId() ?: return@runCatching
 
             val remoteDtos = remoteSource.getAll(congregationId)
+            val remoteIds = remoteDtos.map { it.id }.toSet()
+
+            // Remove any locally synced territories that were deleted remotely
+            val localSyncedIds = territoryDao.getSyncedIds()
+            val deletedRemotely = localSyncedIds.filter { it !in remoteIds }
+            deletedRemotely.forEach { deletedId ->
+                territoryDao.deletePermanent(deletedId)
+                eventDao.deleteByTerritory(deletedId)
+                notificationDao.deleteByTerritory(deletedId)
+            }
 
             remoteDtos.forEach { dto ->
                 val local = territoryDao.getById(dto.id)
@@ -136,10 +152,18 @@ class TerritoryRepositoryImpl @Inject constructor(
         territoryDao.getInProgress().map { it.toDomain() }
 
     override suspend fun delete(id: String) {
-        territoryDao.softDelete(id, System.currentTimeMillis())
         val congregationId = congregationRepository.getCurrentCongregationId()
         if (congregationId != null) {
+            // Delete all subcollection events on Firestore first
+            runCatching { remoteEventSource.deleteAllByTerritory(congregationId, id) }
+                .onFailure { Log.e("TerritoryRepositoryImpl", "Failed to delete remote events for territory $id", it) }
+            // Delete the territory document on Firestore
             runCatching { remoteSource.delete(congregationId, id) }
+                .onFailure { Log.e("TerritoryRepositoryImpl", "Failed to delete remote territory $id", it) }
         }
+        // Permanently remove territory, all its history (events), and notifications locally
+        territoryDao.deletePermanent(id)
+        eventDao.deleteByTerritory(id)
+        notificationDao.deleteByTerritory(id)
     }
 }

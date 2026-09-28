@@ -83,4 +83,10 @@ interface TerritoryDao {
 
     @Query("UPDATE territories SET currentResponsibleName = :newName WHERE currentResponsibleId = :userId")
     suspend fun updateResponsibleName(userId: String, newName: String)
+
+    @Query("DELETE FROM territories WHERE id = :id")
+    suspend fun deletePermanent(id: String)
+
+    @Query("SELECT id FROM territories WHERE synced = 1")
+    suspend fun getSyncedIds(): List<String>
 }

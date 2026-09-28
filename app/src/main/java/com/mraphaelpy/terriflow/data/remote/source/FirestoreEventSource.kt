@@ -72,4 +72,16 @@ class FirestoreEventSource @Inject constructor(
         val doc = eventsCollection(congregationId, territoryId).document(eventId).get().await()
         return doc.exists()
     }
+
+    suspend fun deleteAllByTerritory(congregationId: String, territoryId: String) {
+        val snapshot = eventsCollection(congregationId, territoryId).get().await()
+        if (snapshot.isEmpty) return
+        snapshot.documents.chunked(400).forEach { chunk ->
+            val batch = firestore.batch()
+            for (doc in chunk) {
+                batch.delete(doc.reference)
+            }
+            batch.commit().await()
+        }
+    }
 }

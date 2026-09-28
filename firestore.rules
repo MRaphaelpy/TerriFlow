@@ -115,8 +115,9 @@ service cloud.firestore {
               get(/databases/$(database)/documents/congregations/$(congId)/territories/$(territoryId))
                 .data.currentResponsibleId == request.auth.uid);
 
-          // Eventos são imutáveis após criação
-          allow update, delete: if false;
+          // Eventos são imutáveis após criação, mas podem ser excluídos pelo superadmin ao apagar o território
+          allow delete: if isSuperAdmin(congId);
+          allow update: if false;
         }
       }
 

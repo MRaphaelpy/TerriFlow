@@ -33,4 +33,7 @@ interface TerritoryEventDao {
 
     @Query("SELECT * FROM territory_events WHERE id = :id")
     suspend fun getById(id: String): TerritoryEventEntity?
+
+    @Query("DELETE FROM territory_events WHERE territoryId = :territoryId")
+    suspend fun deleteByTerritory(territoryId: String)
 }
