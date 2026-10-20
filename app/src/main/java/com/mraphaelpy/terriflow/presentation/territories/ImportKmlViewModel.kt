@@ -6,7 +6,9 @@ import android.provider.OpenableColumns
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mraphaelpy.terriflow.core.util.KmlParser
+import com.mraphaelpy.terriflow.core.util.normalizedForSearch
 import com.mraphaelpy.terriflow.domain.model.ImportedTerritory
+import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
 import com.mraphaelpy.terriflow.domain.usecase.territory.ImportTerritoriesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -14,13 +16,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class ImportItem(
     val parsed: ImportedTerritory,
-    val isSelected: Boolean = true
+    val isSelected: Boolean = true,
+    val alreadyExists: Boolean = false
 )
 
 data class ImportKmlUiState(
@@ -33,12 +37,14 @@ data class ImportKmlUiState(
     val isDone: Boolean = false
 ) {
     val selectedCount get() = items.count { it.isSelected }
+    val duplicateCount get() = items.count { it.alreadyExists }
 }
 
 @HiltViewModel
 class ImportKmlViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val importUseCase: ImportTerritoriesUseCase
+    private val importUseCase: ImportTerritoriesUseCase,
+    private val territoryRepository: TerritoryRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ImportKmlUiState())
@@ -53,7 +59,9 @@ class ImportKmlViewModel @Inject constructor(
                 val inputStream = context.contentResolver.openInputStream(uri)
                     ?: throw IllegalArgumentException("Não foi possível abrir o arquivo")
 
-                val parsed = KmlParser.parse(inputStream, isKmz)
+                val parsed = inputStream.use { KmlParser.parse(it, isKmz) }
+                val existingNames = territoryRepository.observeAll().first()
+                    .mapTo(HashSet()) { it.name.normalizedForSearch() }
 
                 if (parsed.isEmpty()) {
                     _uiState.update {
@@ -64,7 +72,10 @@ class ImportKmlViewModel @Inject constructor(
                         it.copy(
                             isParsing = false,
                             fileName = fileName,
-                            items = parsed.map { t -> ImportItem(t) }
+                            items = parsed.map { t ->
+                                val exists = t.name.normalizedForSearch() in existingNames
+                                ImportItem(t, isSelected = !exists, alreadyExists = exists)
+                            }
                         )
                     }
                 }

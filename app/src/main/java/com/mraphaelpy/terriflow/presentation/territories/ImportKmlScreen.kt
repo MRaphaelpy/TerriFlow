@@ -2,7 +2,9 @@ package com.mraphaelpy.terriflow.presentation.territories
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -10,11 +12,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
@@ -24,32 +28,40 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeFlexibleTopAppBar
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.mraphaelpy.terriflow.presentation.components.EmptyState
 import com.mraphaelpy.terriflow.presentation.components.ErrorDialog
 import com.mraphaelpy.terriflow.presentation.components.FullScreenLoadingWithMessage
+import com.mraphaelpy.terriflow.presentation.components.LoadingButton
+import com.mraphaelpy.terriflow.presentation.components.segmentedShape
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun ImportKmlScreen(
     onNavigateBack: () -> Unit,
@@ -57,223 +69,193 @@ fun ImportKmlScreen(
     viewModel: ImportKmlViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-
-    val filePicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.GetContent()
-    ) { uri ->
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) viewModel.parseFile(uri)
     }
+    val pickFile = { filePicker.launch("*/*") }
+    val hasItems = uiState.items.isNotEmpty() && !uiState.isDone
 
-    if (uiState.error != null) {
-        ErrorDialog(
-            message = uiState.error!!,
-            onDismiss = { viewModel.clearError() }
-        )
-    }
+    uiState.error?.let { ErrorDialog(message = it, onDismiss = viewModel::clearError) }
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            LargeFlexibleTopAppBar(
                 title = { Text("Importar KML / KMZ") },
+                subtitle = { if (hasItems) Text(uiState.fileName, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
                     }
                 },
                 actions = {
-                    if (uiState.items.isNotEmpty() && !uiState.isDone) {
-                        val allSelected = uiState.items.all { it.isSelected }
-                        TextButton(onClick = { viewModel.toggleAll(!allSelected) }) {
-                            Text(if (allSelected) "Desmarcar todos" else "Selecionar todos")
-                        }
+                    if (hasItems) {
+                        IconButton(onClick = pickFile) { Icon(Icons.Default.FolderOpen, contentDescription = "Escolher outro arquivo") }
                     }
-                }
+                },
+                scrollBehavior = scrollBehavior
             )
         },
-        floatingActionButton = {
-            if (uiState.items.isNotEmpty() && !uiState.isDone && !uiState.isImporting) {
-                ExtendedFloatingActionButton(
-                    onClick = { viewModel.import() },
-                    icon = { Icon(Icons.Default.Upload, contentDescription = null) },
-                    text = { Text("Importar ${uiState.selectedCount}") },
-                    shape = MaterialTheme.shapes.extraLarge,
-                    containerColor = if (uiState.selectedCount > 0)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        MaterialTheme.colorScheme.surfaceVariant
+        bottomBar = {
+            if (hasItems && !uiState.isImporting) {
+                LoadingButton(
+                    text = when (uiState.selectedCount) {
+                        0 -> "Selecione territórios"
+                        1 -> "Importar 1 território"
+                        else -> "Importar ${uiState.selectedCount} territórios"
+                    },
+                    isLoading = false,
+                    enabled = uiState.selectedCount > 0,
+                    onClick = viewModel::import,
+                    leadingIcon = Icons.Default.Upload,
+                    height = 56.dp,
+                    modifier = Modifier.navigationBarsPadding().padding(16.dp)
                 )
             }
         }
     ) { padding ->
-
+        val contentModifier = Modifier.padding(padding)
         when {
-            uiState.isImporting -> {
-                FullScreenLoadingWithMessage(
-                    message = "Importando territórios...",
-                    modifier = Modifier.padding(padding)
-                )
+            uiState.isImporting -> FullScreenLoadingWithMessage("Importando territórios…", contentModifier)
+            uiState.isParsing -> FullScreenLoadingWithMessage("Lendo arquivo…", contentModifier)
+            uiState.isDone -> CenteredMessage(
+                icon = Icons.Default.CheckCircle,
+                title = if (uiState.importedCount == 1) "1 território importado" else "${uiState.importedCount} territórios importados",
+                message = "Eles já aparecem na lista e no mapa. Agora é só atribuir aos dirigentes.",
+                modifier = contentModifier
+            ) { Button(onClick = onImportDone) { Text("Ir para territórios") } }
+            uiState.items.isEmpty() -> CenteredMessage(
+                icon = Icons.Default.UploadFile,
+                title = "Importe do Google My Maps",
+                message = "No My Maps, abra o mapa, toque em ⋮ › Exportar para KML/KMZ e escolha o arquivo aqui. " +
+                    "Cada polígono vira um território e as quadras são reconhecidas automaticamente.",
+                modifier = contentModifier
+            ) {
+                Button(onClick = pickFile) {
+                    Icon(Icons.Default.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text("Selecionar arquivo")
+                }
             }
+            else -> ImportList(uiState, viewModel, contentModifier)
+        }
+    }
+}
 
-            uiState.isParsing -> {
-                FullScreenLoadingWithMessage(
-                    message = "Lendo arquivo...",
-                    modifier = Modifier.padding(padding)
-                )
-            }
-
-            uiState.isDone -> {
-                EmptyState(
-                    icon = Icons.Default.CheckCircle,
-                    title = "${uiState.importedCount} territórios importados com sucesso!",
-                    iconTint = MaterialTheme.colorScheme.primary,
-                    action = {
-                        Button(onClick = onImportDone, shape = MaterialTheme.shapes.extraLarge) {
-                            Text("Ir para territórios")
-                        }
-                    },
-                    modifier = Modifier.padding(padding)
-                )
-            }
-
-            uiState.items.isEmpty() -> {
-                EmptyState(
-                    icon = Icons.Default.UploadFile,
-                    title = "Selecione um arquivo KML ou KMZ",
-                    subtitle = "Exporte seus territórios do Google My Maps como KML ou KMZ e importe aqui.",
-                    action = {
-                        Button(
-                            onClick = { filePicker.launch("*/*") },
-                            shape = MaterialTheme.shapes.extraLarge
-                        ) {
-                            Icon(Icons.Default.FolderOpen, contentDescription = null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Selecionar arquivo")
-                        }
-                    },
-                    modifier = Modifier.padding(padding)
-                )
-            }
-
-            else -> {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize().padding(padding),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    item {
-                        Column(modifier = Modifier.padding(bottom = 4.dp)) {
-                            Text(
-                                text = "${uiState.items.size} territórios encontrados",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = uiState.fileName,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-
-                    itemsIndexed(uiState.items) { index, item ->
-                        ImportItemCard(
-                            item = item,
-                            onToggle = { viewModel.toggleItem(index) }
+@Composable
+private fun ImportList(uiState: ImportKmlUiState, viewModel: ImportKmlViewModel, modifier: Modifier) {
+    val allSelected = uiState.items.all { it.isSelected }
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        item(key = "summary") {
+            Row(modifier = Modifier.fillMaxWidth().padding(start = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "${uiState.items.size} encontrados · ${uiState.selectedCount} selecionados",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    if (uiState.duplicateCount > 0) {
+                        Text(
+                            "${uiState.duplicateCount} já existem e foram desmarcados",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.error
                         )
                     }
+                }
+                TextButton(onClick = { viewModel.toggleAll(!allSelected) }) {
+                    Text(if (allSelected) "Desmarcar todos" else "Marcar todos")
+                }
+            }
+        }
+        itemsIndexed(uiState.items) { index, item ->
+            ImportRow(item, segmentedShape(index, uiState.items.size)) { viewModel.toggleItem(index) }
+        }
+    }
+}
 
-                    item { Spacer(Modifier.height(88.dp)) }
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ImportRow(item: ImportItem, shape: Shape, onToggle: () -> Unit) {
+    val parsed = item.parsed
+    val isPolygon = parsed.blockPolygons.isNotEmpty() || parsed.boundaryPoints.size >= 3
+    Surface(
+        onClick = onToggle,
+        modifier = Modifier.fillMaxWidth(),
+        shape = shape,
+        color = if (item.isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainer
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Checkbox(checked = item.isSelected, onCheckedChange = { onToggle() })
+            Box(
+                modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.tertiaryContainer, MaterialShapes.Cookie6Sided.toShape()),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    if (isPolygon) Icons.Default.Hexagon else Icons.Default.LocationOn,
+                    contentDescription = if (isPolygon) "Polígono" else "Ponto",
+                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Column(modifier = Modifier.weight(1f).padding(start = 4.dp)) {
+                Text(
+                    parsed.name.ifBlank { "(sem nome)" },
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    when {
+                        parsed.blockPolygons.isNotEmpty() -> "${parsed.blockPolygons.size} quadras"
+                        parsed.boundaryPoints.size >= 3 -> "Contorno com ${parsed.boundaryPoints.size} pontos"
+                        else -> "Apenas um ponto"
+                    },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                if (item.alreadyExists) {
+                    Text("Já existe um território com este nome", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.error)
                 }
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun ImportItemCard(item: ImportItem, onToggle: () -> Unit) {
-    val parsed = item.parsed
-    Card(
-        onClick = onToggle,
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.cardColors(
-            containerColor = if (item.isSelected)
-                MaterialTheme.colorScheme.primaryContainer
-            else
-                MaterialTheme.colorScheme.surfaceContainerLow
-        )
+private fun CenteredMessage(
+    icon: ImageVector,
+    title: String,
+    message: String,
+    modifier: Modifier = Modifier,
+    action: @Composable () -> Unit
+) {
+    Column(
+        modifier = modifier.fillMaxSize().padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp).fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        Box(
+            modifier = Modifier.size(120.dp).background(MaterialTheme.colorScheme.primaryContainer, MaterialShapes.Cookie12Sided.toShape()),
+            contentAlignment = Alignment.Center
         ) {
-            Checkbox(
-                checked = item.isSelected,
-                onCheckedChange = { onToggle() }
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = parsed.name.ifBlank { "(sem nome)" },
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.padding(top = 2.dp)
-                ) {
-                    if (parsed.blockPolygons.isNotEmpty()) {
-                        Text(
-                            text = "${parsed.blockPolygons.size} quadras",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    } else if (parsed.boundaryPoints.isNotEmpty()) {
-                        Text(
-                            text = "${parsed.boundaryPoints.size} pontos",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    parsed.centroid?.let { centroid ->
-                        Text(
-                            text = "%.4f, %.4f".format(centroid.lat, centroid.lng),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                }
-                if (parsed.description.isNotBlank()) {
-                    Text(
-                        text = parsed.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 2.dp)
-                    )
-                }
-            }
-            if (parsed.boundaryPoints.size >= 3) {
-                Icon(
-                    Icons.Default.Hexagon,
-                    contentDescription = "Polígono",
-                    modifier = Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-            } else {
-                Icon(
-                    Icons.Default.LocationOn,
-                    contentDescription = "Ponto",
-                    modifier = Modifier.size(18.dp),
-                    tint = MaterialTheme.colorScheme.tertiary
-                )
-            }
+            Icon(icon, contentDescription = null, modifier = Modifier.size(48.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer)
         }
+        Spacer(Modifier.height(24.dp))
+        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(8.dp))
+        Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(24.dp))
+        action()
     }
 }
