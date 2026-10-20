@@ -29,6 +29,7 @@ class TerriFlowApplication : Application(), Configuration.Provider {
         if (FirebaseApp.getApps(this).isEmpty()) {
             FirebaseApp.initializeApp(this)
         }
+        CrashReporting.init()
         realtimeSyncManager.start()
         scheduleWorkers()
     }
@@ -44,13 +45,13 @@ class TerriFlowApplication : Application(), Configuration.Provider {
 
         workManager.enqueueUniquePeriodicWork(
             SyncWorker.WORK_NAME,
-            ExistingPeriodicWorkPolicy.KEEP,
+            ExistingPeriodicWorkPolicy.UPDATE,
             SyncWorker.buildRequest()
         )
 
         workManager.enqueueUniquePeriodicWork(
             StaleTerritoriesWorker.WORK_NAME,
-            ExistingPeriodicWorkPolicy.KEEP,
+            ExistingPeriodicWorkPolicy.UPDATE,
             StaleTerritoriesWorker.buildRequest()
         )
     }
