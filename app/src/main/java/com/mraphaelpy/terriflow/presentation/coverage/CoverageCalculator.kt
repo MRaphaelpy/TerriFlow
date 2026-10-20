@@ -28,8 +28,10 @@ object CoverageCalculator {
             CoverageSortOption.NEVER_WORKED -> coverages.filter { it.lastCompletedDate == null }
             CoverageSortOption.OLDEST_COMPLETED_FIRST ->
                 coverages.sortedWith(compareBy(nullsFirst()) { it.lastCompletedDate })
+            // compareByDescending(nullsLast()) inverteria também os nulos, colocando
+            // territórios nunca trabalhados no topo
             CoverageSortOption.NEWEST_COMPLETED_FIRST ->
-                coverages.sortedWith(compareByDescending(nullsLast()) { it.lastCompletedDate })
+                coverages.sortedWith(compareBy(nullsLast(reverseOrder())) { it.lastCompletedDate })
             CoverageSortOption.MOST_WORKED -> coverages.sortedByDescending { it.completionCount }
         }
 }

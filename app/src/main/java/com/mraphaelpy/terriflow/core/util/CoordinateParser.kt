@@ -13,9 +13,11 @@ object CoordinateParser {
 
     fun parse(input: String): LatLng? {
         val trimmed = input.trim()
+        // DMS antes do decimal: o decimal trata ° ' " como separadores e leria
+        // "23°33'01.8\"S 46°37'59.9\"W" como lat=23, lng=33
         return tryUrl(trimmed)
-            ?: tryDecimal(trimmed)
             ?: tryDMS(trimmed)
+            ?: tryDecimal(trimmed)
     }
 
     private fun tryUrl(input: String): LatLng? {
@@ -30,7 +32,7 @@ object CoordinateParser {
             .replace(",", " ")
             .trim()
         val parts = cleaned.split(Regex("\\s+")).filter { it.isNotEmpty() }
-        if (parts.size < 2) return null
+        if (parts.size != 2) return null
         val lat = parts[0].toDoubleOrNull() ?: return null
         val lng = parts[1].toDoubleOrNull() ?: return null
         if (lat < -90 || lat > 90 || lng < -180 || lng > 180) return null
