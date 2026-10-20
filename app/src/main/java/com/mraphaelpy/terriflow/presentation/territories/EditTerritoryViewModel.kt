@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mraphaelpy.terriflow.domain.model.LatLng
 import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
+import com.mraphaelpy.terriflow.domain.usecase.territory.TerritoryChanges
 import com.mraphaelpy.terriflow.domain.usecase.territory.UpdateTerritoryUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -105,16 +106,19 @@ class EditTerritoryViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSaving = true, error = null)
             runCatching {
+                val state = _uiState.value
                 updateTerritoryUseCase(
                     id = territoryId,
-                    code = code.ifBlank { null },
-                    name = name,
-                    description = description,
-                    location = location,
-                    notes = notes,
-                    latitude = _uiState.value.latitude,
-                    longitude = _uiState.value.longitude,
-                    boundaryPoints = _uiState.value.boundaryPoints
+                    changes = TerritoryChanges(
+                        code = code.ifBlank { null },
+                        name = name,
+                        description = description,
+                        location = location,
+                        notes = notes,
+                        latitude = state.latitude,
+                        longitude = state.longitude,
+                        boundaryPoints = state.boundaryPoints
+                    )
                 )
             }.onSuccess {
                 _uiState.value = _uiState.value.copy(isSaving = false, success = true)

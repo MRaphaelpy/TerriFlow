@@ -26,6 +26,7 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.AddCircle
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Layers
 import androidx.compose.material.icons.filled.MoreHoriz
@@ -35,7 +36,6 @@ import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -255,7 +255,7 @@ fun DashboardScreen(
                                 )
                             }
                             Text(
-                                text = if (uiState.isAdmin) "Administrador" else "Responsável",
+                                text = uiState.currentUser?.role?.label() ?: "",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.SemiBold
@@ -539,4 +539,4 @@ private fun RecentEventItem(event: TerritoryEvent, onClick: () -> Unit) {
     }
 }
 
-private val DashboardUiState.isAdmin: Boolean get() = currentUser?.role?.name == "ADMIN" || currentUser?.role?.name == "SUPER_ADMIN"
+private val DashboardUiState.isAdmin: Boolean get() = currentUser?.isAdmin == true

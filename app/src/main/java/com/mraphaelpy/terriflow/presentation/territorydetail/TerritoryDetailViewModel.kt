@@ -3,15 +3,21 @@ package com.mraphaelpy.terriflow.presentation.territorydetail
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mraphaelpy.terriflow.domain.model.EventType
+import com.mraphaelpy.terriflow.domain.model.ResponsibleRotationInfo
 import com.mraphaelpy.terriflow.domain.model.Territory
+import com.mraphaelpy.terriflow.domain.model.TerritoryAction
 import com.mraphaelpy.terriflow.domain.model.TerritoryEvent
+import com.mraphaelpy.terriflow.domain.model.TerritoryRotationHelper
 import com.mraphaelpy.terriflow.domain.model.User
+import com.mraphaelpy.terriflow.domain.policy.TerritoryActionPolicy
 import com.mraphaelpy.terriflow.domain.repository.AuthRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryEventRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
 import com.mraphaelpy.terriflow.domain.repository.UserRepository
 import com.mraphaelpy.terriflow.domain.usecase.territory.AssignTerritoryUseCase
 import com.mraphaelpy.terriflow.domain.usecase.territory.CompleteTerritoryUseCase
+import com.mraphaelpy.terriflow.domain.usecase.territory.DeleteTerritoryUseCase
 import com.mraphaelpy.terriflow.domain.usecase.territory.PauseTerritoryUseCase
 import com.mraphaelpy.terriflow.domain.usecase.territory.ReturnTerritoryUseCase
 import com.mraphaelpy.terriflow.domain.usecase.territory.StartTerritoryUseCase
@@ -36,12 +42,18 @@ data class TerritoryDetailUiState(
     val isLoading: Boolean = true,
     val error: String? = null,
     val actionSuccess: String? = null,
-    val rotationInfo: List<com.mraphaelpy.terriflow.domain.model.ResponsibleRotationInfo> = emptyList(),
-    val pastWorkers: List<com.mraphaelpy.terriflow.domain.model.ResponsibleRotationInfo> = emptyList(),
-    val suggestedWorkers: List<com.mraphaelpy.terriflow.domain.model.ResponsibleRotationInfo> = emptyList(),
+    val isDeleted: Boolean = false,
+    val rotationInfo: List<ResponsibleRotationInfo> = emptyList(),
+    val pastWorkers: List<ResponsibleRotationInfo> = emptyList(),
+    val suggestedWorkers: List<ResponsibleRotationInfo> = emptyList(),
     val historyCycles: List<HistoryCycle> = emptyList()
 ) {
-    val isAdmin: Boolean get() = currentUser?.role?.name == "ADMIN" || currentUser?.role?.name == "SUPER_ADMIN"
+    val isAdmin: Boolean get() = currentUser?.isAdmin == true
+
+    val allowedActions: Set<TerritoryAction>
+        get() = territory?.let { TerritoryActionPolicy.allowedActions(currentUser, it) } ?: emptySet()
+
+    fun can(action: TerritoryAction): Boolean = action in allowedActions
 }
 
 @HiltViewModel
@@ -55,7 +67,8 @@ class TerritoryDetailViewModel @Inject constructor(
     private val startTerritory: StartTerritoryUseCase,
     private val pauseTerritory: PauseTerritoryUseCase,
     private val completeTerritory: CompleteTerritoryUseCase,
-    private val returnTerritory: ReturnTerritoryUseCase
+    private val returnTerritory: ReturnTerritoryUseCase,
+    private val deleteTerritory: DeleteTerritoryUseCase
 ) : ViewModel() {
 
     private val territoryId: String = checkNotNull(savedStateHandle["territoryId"])
@@ -98,7 +111,7 @@ class TerritoryDetailViewModel @Inject constructor(
         responsibles: List<User> = _uiState.value.responsibles,
         isLoading: Boolean = _uiState.value.isLoading
     ) {
-        val rotation = com.mraphaelpy.terriflow.domain.model.TerritoryRotationHelper.computeRotationInfo(responsibles, territory, events)
+        val rotation = TerritoryRotationHelper.computeRotationInfo(responsibles, territory, events)
         val past = rotation.filter { it.hasWorkedPreviously }.sortedByDescending { it.lastAssignedDate }
         val suggested = rotation.filter { !it.hasWorkedPreviously && it.user.id != territory?.currentResponsibleId }
         val cycles = computeHistoryCycles(events)
@@ -123,13 +136,13 @@ class TerritoryDetailViewModel @Inject constructor(
         var currentEvents = mutableListOf<TerritoryEvent>()
 
         for (event in events.sortedBy { it.timestamp }) {
-            if (event.type == com.mraphaelpy.terriflow.domain.model.EventType.ASSIGNED) {
+            if (event.type == EventType.ASSIGNED) {
                 if (currentEvents.isNotEmpty()) {
                     cycles.add(HistoryCycle(currentResponsible, currentEvents.reversed()))
                     currentEvents = mutableListOf()
                 }
                 currentResponsible = event.extra["responsibleName"] ?: event.userName
-            } else if (event.type == com.mraphaelpy.terriflow.domain.model.EventType.TRANSFERRED) {
+            } else if (event.type == EventType.TRANSFERRED) {
                 if (currentEvents.isNotEmpty()) {
                     cycles.add(HistoryCycle(currentResponsible, currentEvents.reversed()))
                     currentEvents = mutableListOf()
@@ -169,9 +182,9 @@ class TerritoryDetailViewModel @Inject constructor(
         _uiState.update { it.copy(actionSuccess = "Território devolvido") }
     }
 
-    fun deleteTerritory() = performAction {
-        territoryRepository.delete(territoryId)
-        _uiState.update { it.copy(actionSuccess = "deleted") }
+    fun delete() = performAction {
+        deleteTerritory(territoryId)
+        _uiState.update { it.copy(isDeleted = true) }
     }
 
     fun clearMessages() {

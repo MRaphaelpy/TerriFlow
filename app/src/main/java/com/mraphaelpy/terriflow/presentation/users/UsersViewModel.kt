@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mraphaelpy.terriflow.domain.model.User
 import com.mraphaelpy.terriflow.domain.model.UserRole
+import com.mraphaelpy.terriflow.domain.model.label
 import com.mraphaelpy.terriflow.domain.repository.AuthRepository
 import com.mraphaelpy.terriflow.domain.repository.UserRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -25,11 +26,9 @@ data class UsersUiState(
     val error: String? = null,
     val successMessage: String? = null
 ) {
-    val isAdmin: Boolean
-        get() = currentUser?.role in listOf(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+    val isAdmin: Boolean get() = currentUser?.isAdmin == true
 
-    val isSuperAdmin: Boolean
-        get() = currentUser?.role == UserRole.SUPER_ADMIN
+    val isSuperAdmin: Boolean get() = currentUser?.isSuperAdmin == true
 }
 
 @HiltViewModel
@@ -92,12 +91,12 @@ class UsersViewModel @Inject constructor(
 
     fun updateUserRole(user: User, newRole: UserRole) {
         val current = _uiState.value.currentUser
-        if (current?.role !in listOf(UserRole.ADMIN, UserRole.SUPER_ADMIN)) {
+        if (current?.isAdmin != true) {
             _uiState.update { it.copy(error = "Você não tem permissão para alterar funções") }
             return
         }
 
-        if (user.role == UserRole.SUPER_ADMIN && current?.role != UserRole.SUPER_ADMIN) {
+        if (user.isSuperAdmin && !current.isSuperAdmin) {
             _uiState.update { it.copy(error = "Apenas o Super Admin pode alterar a função do criador") }
             return
         }
@@ -107,12 +106,7 @@ class UsersViewModel @Inject constructor(
             runCatching {
                 userRepository.save(updatedUser)
             }.onSuccess {
-                val roleName = when (newRole) {
-                    UserRole.SUPER_ADMIN -> "Super Administrador"
-                    UserRole.ADMIN -> "Administrador"
-                    UserRole.RESPONSIBLE -> "Responsável"
-                }
-                _uiState.update { it.copy(successMessage = "${user.name} agora é $roleName") }
+                _uiState.update { it.copy(successMessage = "${user.name} agora é ${newRole.label()}") }
             }.onFailure { e ->
                 _uiState.update { it.copy(error = "Erro ao alterar função: ${e.message ?: "Tente novamente"}") }
             }
@@ -128,7 +122,7 @@ class UsersViewModel @Inject constructor(
 
         val current = _uiState.value.currentUser
         val isSelf = current?.id == user.id
-        val isAdmin = current?.role in listOf(UserRole.ADMIN, UserRole.SUPER_ADMIN)
+        val isAdmin = current?.isAdmin == true
 
         if (!isSelf && !isAdmin) {
             _uiState.update { it.copy(error = "Você não tem permissão para alterar o nome de outro usuário") }
@@ -152,17 +146,17 @@ class UsersViewModel @Inject constructor(
 
     fun toggleUserStatus(user: User) {
         val current = _uiState.value.currentUser
-        if (current?.role !in listOf(UserRole.ADMIN, UserRole.SUPER_ADMIN)) {
+        if (current?.isAdmin != true) {
             _uiState.update { it.copy(error = "Você não tem permissão para alterar o status do usuário") }
             return
         }
 
-        if (user.role == UserRole.SUPER_ADMIN) {
+        if (user.isSuperAdmin) {
             _uiState.update { it.copy(error = "Não é possível desativar o Super Admin") }
             return
         }
 
-        if (current != null && user.id == current.id) {
+        if (user.id == current.id) {
             _uiState.update { it.copy(error = "Você não pode desativar sua própria conta") }
             return
         }

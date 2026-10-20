@@ -86,6 +86,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mraphaelpy.terriflow.core.util.DateFormats
 import com.mraphaelpy.terriflow.core.util.MapColors
 import com.mraphaelpy.terriflow.domain.model.Territory
+import com.mraphaelpy.terriflow.domain.model.TerritoryAction
 import com.mraphaelpy.terriflow.domain.model.TerritoryEvent
 import com.mraphaelpy.terriflow.domain.model.TerritoryStatus
 import com.mraphaelpy.terriflow.domain.model.User
@@ -121,12 +122,11 @@ fun TerritoryDetailScreen(
     var showReturnDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
+    LaunchedEffect(uiState.isDeleted) {
+        if (uiState.isDeleted) onNavigateBack()
+    }
     LaunchedEffect(uiState.actionSuccess) {
         uiState.actionSuccess?.let {
-            if (it == "deleted") {
-                onNavigateBack()
-                return@let
-            }
             snackbarHostState.showSnackbar(it)
             viewModel.clearMessages()
         }
@@ -182,7 +182,7 @@ fun TerritoryDetailScreen(
             text = "Esta ação não pode ser desfeita. O território será removido permanentemente de todos os dispositivos.",
             confirmLabel = "Apagar",
             onConfirm = {
-                viewModel.deleteTerritory()
+                viewModel.delete()
                 showDeleteDialog = false
             },
             onDismiss = { showDeleteDialog = false }
@@ -205,10 +205,12 @@ fun TerritoryDetailScreen(
                                 Icon(Icons.Default.Map, contentDescription = "Ver no mapa")
                             }
                         }
-                        if (uiState.isAdmin) {
+                        if (uiState.can(TerritoryAction.DELETE)) {
                             IconButton(onClick = { showDeleteDialog = true }) {
                                 Icon(Icons.Default.Delete, contentDescription = "Apagar", tint = MaterialTheme.colorScheme.error)
                             }
+                        }
+                        if (uiState.can(TerritoryAction.EDIT)) {
                             IconButton(onClick = { onNavigateToEdit(t.id) }) {
                                 Icon(Icons.Default.Edit, contentDescription = "Editar")
                             }
@@ -246,7 +248,6 @@ fun TerritoryDetailScreen(
             )
             ActionButtons(
                 uiState,
-                territory,
                 onAssign = { showAssignDialog = true },
                 onStart = { viewModel.start() },
                 onPause = { viewModel.pause() },
@@ -334,17 +335,12 @@ private fun TerritoryInfoCard(territory: Territory, onViewMap: () -> Unit = {}) 
 @Composable
 private fun ActionButtons(
     uiState: TerritoryDetailUiState,
-    territory: Territory,
     onAssign: () -> Unit,
     onStart: () -> Unit,
     onPause: () -> Unit,
     onComplete: () -> Unit,
     onReturn: () -> Unit
 ) {
-    val currentUserId = uiState.currentUser?.id
-    val isResponsible = currentUserId == territory.currentResponsibleId
-    val isAdmin = uiState.isAdmin
-
     Column(
         verticalArrangement = Arrangement.spacedBy(8.dp),
         modifier = Modifier.animateContentSize(
@@ -354,28 +350,28 @@ private fun ActionButtons(
             )
         )
     ) {
-        if (isAdmin && (territory.status == TerritoryStatus.AVAILABLE || territory.status == TerritoryStatus.RETURNED || territory.status == TerritoryStatus.COMPLETED)) {
+        if (uiState.can(TerritoryAction.ASSIGN)) {
             OutlinedButton(onClick = onAssign, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.PersonAdd, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text("Atribuir território")
             }
         }
-        if ((isResponsible || isAdmin) && (territory.status == TerritoryStatus.ASSIGNED || territory.status == TerritoryStatus.PAUSED)) {
+        if (uiState.can(TerritoryAction.START)) {
             Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.PlayArrow, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
-                Text(if (territory.status == TerritoryStatus.PAUSED) "Retomar trabalho" else "Iniciar trabalho")
+                Text(if (uiState.territory?.status == TerritoryStatus.PAUSED) "Retomar trabalho" else "Iniciar trabalho")
             }
         }
-        if ((isResponsible || isAdmin) && territory.status == TerritoryStatus.IN_PROGRESS) {
+        if (uiState.can(TerritoryAction.PAUSE)) {
             OutlinedButton(onClick = onPause, modifier = Modifier.fillMaxWidth()) {
                 Icon(Icons.Default.Pause, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text("Pausar trabalho")
             }
         }
-        if ((isResponsible || isAdmin) && (territory.status == TerritoryStatus.IN_PROGRESS || territory.status == TerritoryStatus.PAUSED)) {
+        if (uiState.can(TerritoryAction.COMPLETE)) {
             Button(
                 onClick = onComplete,
                 modifier = Modifier.fillMaxWidth(),
@@ -386,7 +382,7 @@ private fun ActionButtons(
                 Text("Finalizar território")
             }
         }
-        if ((isResponsible || isAdmin) && territory.status != TerritoryStatus.AVAILABLE && territory.status != TerritoryStatus.RETURNED && territory.status != TerritoryStatus.ARCHIVED) {
+        if (uiState.can(TerritoryAction.RETURN)) {
             OutlinedButton(
                 onClick = onReturn,
                 modifier = Modifier.fillMaxWidth(),

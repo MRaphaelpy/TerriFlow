@@ -1,6 +1,7 @@
 package com.mraphaelpy.terriflow.domain.model
 
 import java.util.Date
+import java.util.UUID
 
 enum class EventType {
     CREATED,
@@ -37,4 +38,24 @@ data class TerritoryEvent(
     val timestamp: Date = Date(),
     val extra: Map<String, String> = emptyMap(),
     val congregationId: String = ""
-)
+) {
+    companion object {
+        /** Cria um novo evento registrando [actor] como autor da ação. */
+        fun create(
+            territoryId: String,
+            actor: User,
+            type: EventType,
+            timestamp: Date = Date(),
+            extra: Map<String, String> = emptyMap()
+        ) = TerritoryEvent(
+            id = UUID.randomUUID().toString(),
+            territoryId = territoryId,
+            userId = actor.id,
+            userName = actor.name,
+            type = type,
+            timestamp = timestamp,
+            extra = extra,
+            congregationId = actor.congregationId
+        )
+    }
+}

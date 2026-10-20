@@ -1,75 +1,73 @@
 package com.mraphaelpy.terriflow.domain.usecase.territory
 
+import com.mraphaelpy.terriflow.domain.model.DomainException
 import com.mraphaelpy.terriflow.domain.model.EventType
 import com.mraphaelpy.terriflow.domain.model.LatLng
+import com.mraphaelpy.terriflow.domain.model.TerritoryAction
 import com.mraphaelpy.terriflow.domain.model.TerritoryEvent
-import com.mraphaelpy.terriflow.domain.repository.AuthRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryEventRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
 import java.util.Date
-import java.util.UUID
 import javax.inject.Inject
 
+data class TerritoryChanges(
+    val code: String?,
+    val name: String,
+    val description: String,
+    val location: String,
+    val notes: String,
+    val latitude: Double?,
+    val longitude: Double?,
+    val boundaryPoints: List<LatLng> = emptyList()
+)
+
 class UpdateTerritoryUseCase @Inject constructor(
+    private val guard: TerritoryActionGuard,
     private val territoryRepository: TerritoryRepository,
-    private val eventRepository: TerritoryEventRepository,
-    private val authRepository: AuthRepository
+    private val eventRepository: TerritoryEventRepository
 ) {
-    suspend operator fun invoke(
-        id: String,
-        code: String?,
-        name: String,
-        description: String,
-        location: String,
-        notes: String,
-        latitude: Double?,
-        longitude: Double?,
-        boundaryPoints: List<LatLng> = emptyList()
-    ) {
-        val user = authRepository.getCurrentUser()
-            ?: throw IllegalStateException("Usuário não autenticado")
-        val existing = territoryRepository.getById(id)
-            ?: throw IllegalStateException("Território não encontrado")
+    suspend operator fun invoke(id: String, changes: TerritoryChanges) {
+        val (actor, existing) = guard.authorize(id, TerritoryAction.EDIT)
         val now = Date()
 
-        val finalCode = if (!code.isNullOrBlank() && code.trim() != existing.code) {
-            val duplicate = territoryRepository.getByCode(code.trim())
+        val requestedCode = changes.code?.trim().orEmpty()
+        val finalCode = if (requestedCode.isNotEmpty() && requestedCode != existing.code) {
+            val duplicate = territoryRepository.getByCode(requestedCode)
             if (duplicate != null && duplicate.id != id) {
-                throw IllegalArgumentException("Já existe um território com o código '${code.trim()}'")
+                throw DomainException.DuplicateTerritoryCode(requestedCode)
             }
-            code.trim()
+            requestedCode
         } else {
             existing.code
         }
 
         val updated = existing.copy(
             code = finalCode,
-            name = name.trim(),
-            description = description.trim(),
-            location = location.trim(),
-            notes = notes.trim(),
-            latitude = latitude,
-            longitude = longitude,
-            boundaryPoints = boundaryPoints,
+            name = changes.name.trim(),
+            description = changes.description.trim(),
+            location = changes.location.trim(),
+            notes = changes.notes.trim(),
+            latitude = changes.latitude,
+            longitude = changes.longitude,
+            boundaryPoints = changes.boundaryPoints,
             updatedAt = now
         )
         territoryRepository.save(updated)
 
-        val event = TerritoryEvent(
-            id = UUID.randomUUID().toString(),
-            territoryId = id,
-            userId = user.id,
-            userName = user.name,
-            type = EventType.UPDATED,
-            timestamp = now,
-            extra = buildMap {
-                if (existing.code != finalCode) put("code", finalCode)
-                if (existing.name != name) put("name", name)
-                if (existing.location != location) put("location", location)
-                if (latitude != null) put("lat", latitude.toString())
-                if (longitude != null) put("lng", longitude.toString())
-            }
+        eventRepository.save(
+            TerritoryEvent.create(
+                territoryId = id,
+                actor = actor,
+                type = EventType.UPDATED,
+                timestamp = now,
+                extra = buildMap {
+                    if (existing.code != updated.code) put("code", updated.code)
+                    if (existing.name != updated.name) put("name", updated.name)
+                    if (existing.location != updated.location) put("location", updated.location)
+                    updated.latitude?.let { put("lat", it.toString()) }
+                    updated.longitude?.let { put("lng", it.toString()) }
+                }
+            )
         )
-        eventRepository.save(event)
     }
 }

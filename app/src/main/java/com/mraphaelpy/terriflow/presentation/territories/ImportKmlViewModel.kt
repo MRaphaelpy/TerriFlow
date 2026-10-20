@@ -6,6 +6,7 @@ import android.provider.OpenableColumns
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mraphaelpy.terriflow.core.util.KmlParser
+import com.mraphaelpy.terriflow.domain.model.ImportedTerritory
 import com.mraphaelpy.terriflow.domain.usecase.territory.ImportTerritoriesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -18,7 +19,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class ImportItem(
-    val parsed: KmlParser.ParsedTerritory,
+    val parsed: ImportedTerritory,
     val isSelected: Boolean = true
 )
 

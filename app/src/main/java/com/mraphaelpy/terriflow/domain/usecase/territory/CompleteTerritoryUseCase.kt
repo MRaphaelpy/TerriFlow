@@ -1,108 +1,104 @@
 package com.mraphaelpy.terriflow.domain.usecase.territory
 
 import com.mraphaelpy.terriflow.domain.model.AppNotification
+import com.mraphaelpy.terriflow.domain.model.DomainException
 import com.mraphaelpy.terriflow.domain.model.EventType
 import com.mraphaelpy.terriflow.domain.model.NotificationType
+import com.mraphaelpy.terriflow.domain.model.TerritoryAction
 import com.mraphaelpy.terriflow.domain.model.TerritoryEvent
 import com.mraphaelpy.terriflow.domain.model.TerritoryStatus
-import com.mraphaelpy.terriflow.domain.repository.AuthRepository
+import com.mraphaelpy.terriflow.domain.model.displayName
 import com.mraphaelpy.terriflow.domain.repository.NotificationRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryEventRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
 import com.mraphaelpy.terriflow.domain.repository.UserRepository
 import java.util.Date
-import java.util.UUID
 import javax.inject.Inject
 
+/**
+ * Finaliza o território. Se [nextResponsibleId] for informado, o território é
+ * transferido diretamente para o próximo responsável.
+ */
 class CompleteTerritoryUseCase @Inject constructor(
+    private val guard: TerritoryActionGuard,
     private val territoryRepository: TerritoryRepository,
     private val eventRepository: TerritoryEventRepository,
     private val notificationRepository: NotificationRepository,
-    private val userRepository: UserRepository,
-    private val authRepository: AuthRepository
+    private val userRepository: UserRepository
 ) {
     suspend operator fun invoke(territoryId: String, nextResponsibleId: String? = null) {
-        val user = authRepository.getCurrentUser()
-            ?: throw IllegalStateException("Usuário não autenticado")
-        val territory = territoryRepository.getById(territoryId)
-            ?: throw IllegalStateException("Território não encontrado")
+        val (actor, territory) = guard.authorize(territoryId, TerritoryAction.COMPLETE)
+        val nextResponsible = nextResponsibleId?.let {
+            userRepository.getById(it) ?: throw DomainException.UserNotFound()
+        }
         val now = Date()
+        val pastResponsibleIds =
+            (territory.pastResponsibleIds + listOfNotNull(territory.currentResponsibleId)).distinct()
 
-        val basePast = (territory.pastResponsibleIds + listOfNotNull(territory.currentResponsibleId)).distinct()
-        val updated = territory.copy(
-            status = TerritoryStatus.COMPLETED,
-            pastResponsibleIds = basePast,
-            completedAt = now,
-            updatedAt = now
+        // Os eventos são gravados antes do território: as regras do Firestore só aceitam
+        // eventos de um não-admin enquanto ele ainda é o responsável atual.
+        eventRepository.save(
+            TerritoryEvent.create(territory.id, actor, EventType.COMPLETED, now)
         )
-        territoryRepository.save(updated)
 
-        val completedEvent = TerritoryEvent(
-            id = UUID.randomUUID().toString(),
-            territoryId = territory.id,
-            userId = user.id,
-            userName = user.name,
-            type = EventType.COMPLETED,
-            timestamp = now
-        )
-        eventRepository.save(completedEvent)
-
-        if (nextResponsibleId == null) {
-            val notification = AppNotification(
-                id = UUID.randomUUID().toString(),
-                userId = "",
-                title = "Território finalizado",
-                body = "${territory.code} — ${territory.name} foi finalizado por ${user.name}",
-                type = NotificationType.TERRITORY_COMPLETED,
-                territoryId = territory.id,
-                territoryCode = territory.code,
-                createdAt = now
-            )
-            notificationRepository.save(notification)
-        } else {
-            val nextResponsible = userRepository.getById(nextResponsibleId)
-            if (nextResponsible != null) {
-                val transferred = updated.copy(
-                    status = TerritoryStatus.ASSIGNED,
-                    currentResponsibleId = nextResponsible.id,
-                    currentResponsibleName = nextResponsible.name,
-                    currentResponsiblePhotoUrl = nextResponsible.photoUrl,
-                    pastResponsibleIds = (basePast + nextResponsible.id).distinct(),
-                    assignedAt = now,
-                    completedAt = null,
-                    startedAt = null,
+        if (nextResponsible == null) {
+            territoryRepository.save(
+                territory.copy(
+                    status = TerritoryStatus.COMPLETED,
+                    pastResponsibleIds = pastResponsibleIds,
+                    completedAt = now,
                     updatedAt = now
                 )
-                territoryRepository.save(transferred)
-
-                val transferEvent = TerritoryEvent(
-                    id = UUID.randomUUID().toString(),
-                    territoryId = territory.id,
-                    userId = user.id,
-                    userName = user.name,
-                    type = EventType.TRANSFERRED,
-                    timestamp = now,
-                    extra = mapOf(
-                        "fromUserId" to (territory.currentResponsibleId ?: ""),
-                        "fromUserName" to (territory.currentResponsibleName ?: ""),
-                        "toUserId" to nextResponsible.id,
-                        "toUserName" to nextResponsible.name
-                    )
-                )
-                eventRepository.save(transferEvent)
-
-                val notification = AppNotification(
-                    id = UUID.randomUUID().toString(),
-                    userId = nextResponsible.id,
-                    title = "Território transferido para você",
-                    body = "${territory.code} — ${territory.name}",
-                    type = NotificationType.TERRITORY_TRANSFERRED,
-                    territoryId = territory.id,
-                    territoryCode = territory.code,
+            )
+            notificationRepository.save(
+                AppNotification.aboutTerritory(
+                    territory = territory,
+                    recipientId = AppNotification.BROADCAST,
+                    title = "Território finalizado",
+                    body = "${territory.displayName} foi finalizado por ${actor.name}",
+                    type = NotificationType.TERRITORY_COMPLETED,
                     createdAt = now
                 )
-                notificationRepository.save(notification)
-            }
+            )
+            return
         }
+
+        eventRepository.save(
+            TerritoryEvent.create(
+                territoryId = territory.id,
+                actor = actor,
+                type = EventType.TRANSFERRED,
+                timestamp = now,
+                extra = mapOf(
+                    "fromUserId" to (territory.currentResponsibleId ?: ""),
+                    "fromUserName" to (territory.currentResponsibleName ?: ""),
+                    "toUserId" to nextResponsible.id,
+                    "toUserName" to nextResponsible.name
+                )
+            )
+        )
+        territoryRepository.save(
+            territory.copy(
+                status = TerritoryStatus.ASSIGNED,
+                currentResponsibleId = nextResponsible.id,
+                currentResponsibleName = nextResponsible.name,
+                currentResponsiblePhotoUrl = nextResponsible.photoUrl,
+                pastResponsibleIds = (pastResponsibleIds + nextResponsible.id).distinct(),
+                assignedAt = now,
+                startedAt = null,
+                completedAt = null,
+                updatedAt = now
+            )
+        )
+        notificationRepository.save(
+            AppNotification.aboutTerritory(
+                territory = territory,
+                recipientId = nextResponsible.id,
+                title = "Território transferido para você",
+                body = territory.displayName,
+                type = NotificationType.TERRITORY_TRANSFERRED,
+                createdAt = now
+            )
+        )
     }
 }

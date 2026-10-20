@@ -1,6 +1,7 @@
 package com.mraphaelpy.terriflow.core.util
 
 import android.util.Xml
+import com.mraphaelpy.terriflow.domain.model.ImportedTerritory
 import com.mraphaelpy.terriflow.domain.model.LatLng
 import org.xmlpull.v1.XmlPullParser
 import java.io.BufferedInputStream
@@ -9,23 +10,7 @@ import java.util.zip.ZipInputStream
 
 object KmlParser {
 
-    data class ParsedTerritory(
-        val name: String,
-        val description: String,
-        val boundaryPoints: List<LatLng>,
-        val centerPoint: LatLng?,
-        val blockPolygons: List<List<LatLng>> = emptyList()
-    ) {
-        val centroid: LatLng?
-            get() = centerPoint ?: if (boundaryPoints.size >= 3) {
-                LatLng(
-                    lat = boundaryPoints.map { it.lat }.average(),
-                    lng = boundaryPoints.map { it.lng }.average()
-                )
-            } else null
-    }
-
-    fun parse(inputStream: InputStream, isKmz: Boolean): List<ParsedTerritory> {
+    fun parse(inputStream: InputStream, isKmz: Boolean): List<ImportedTerritory> {
         val kmlStream = if (isKmz) {
             extractKmlFromKmz(inputStream) ?: return emptyList()
         } else {
@@ -47,8 +32,8 @@ object KmlParser {
         return null
     }
 
-    private fun parseKml(inputStream: InputStream): List<ParsedTerritory> {
-        val results = mutableListOf<ParsedTerritory>()
+    private fun parseKml(inputStream: InputStream): List<ImportedTerritory> {
+        val results = mutableListOf<ImportedTerritory>()
 
         val parser = Xml.newPullParser()
         parser.setFeature(XmlPullParser.FEATURE_PROCESS_NAMESPACES, false)
@@ -114,7 +99,7 @@ object KmlParser {
                 XmlPullParser.END_TAG -> when (parser.name) {
                     "Folder" -> {
                         if (folderDepth == 1 && folderAllPoints.size >= 3) {
-                            results += ParsedTerritory(
+                            results += ImportedTerritory(
                                 name = folderName.trim().ifEmpty { "Território" },
                                 description = folderDesc.trim(),
                                 boundaryPoints = convexHull(folderAllPoints),
@@ -132,7 +117,7 @@ object KmlParser {
                             }
                         } else {
                             if (currentBoundary.size >= 3 || currentPoint != null) {
-                                results += ParsedTerritory(
+                                results += ImportedTerritory(
                                     name = currentName.trim(),
                                     description = currentDesc.trim(),
                                     boundaryPoints = currentBoundary.toList(),

@@ -3,7 +3,6 @@ package com.mraphaelpy.terriflow.presentation.territories
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mraphaelpy.terriflow.domain.model.Territory
-import com.mraphaelpy.terriflow.domain.model.UserRole
 import com.mraphaelpy.terriflow.domain.repository.AuthRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -59,7 +58,7 @@ class TerritoryListViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             val user = authRepository.getCurrentUser()
-            _isAdmin.value = user?.role == UserRole.ADMIN || user?.role == UserRole.SUPER_ADMIN
+            _isAdmin.value = user?.isAdmin == true
             _currentUserId.value = user?.id
             _isLoading.value = false
         }

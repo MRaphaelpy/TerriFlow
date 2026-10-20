@@ -22,6 +22,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mraphaelpy.terriflow.domain.model.User
 import com.mraphaelpy.terriflow.domain.model.UserRole
+import com.mraphaelpy.terriflow.domain.model.label
 import com.mraphaelpy.terriflow.presentation.components.FullScreenLoading
 import com.mraphaelpy.terriflow.presentation.components.UserAvatar
 
@@ -133,7 +134,7 @@ fun UsersScreen(
                     )
                 }
                 item {
-                    val adminCount = uiState.users.count { it.role in listOf(UserRole.ADMIN, UserRole.SUPER_ADMIN) }
+                    val adminCount = uiState.users.count { it.isAdmin }
                     FilterChip(
                         selected = uiState.filterRole == UserRole.ADMIN,
                         onClick = { viewModel.onFilterRoleSelected(UserRole.ADMIN) },
@@ -211,11 +212,7 @@ fun UsersScreen(
 
     // Dialog: Confirmar Alteração de Função
     userToChangeRole?.let { (targetUser, newRole) ->
-        val roleLabel = when (newRole) {
-            UserRole.SUPER_ADMIN -> "Super Administrador"
-            UserRole.ADMIN -> "Administrador"
-            UserRole.RESPONSIBLE -> "Responsável"
-        }
+        val roleLabel = newRole.label()
         val explanation = when (newRole) {
             UserRole.ADMIN -> "Ao tornar este irmão Administrador, ele poderá gerenciar territórios, atribuir designações e administrar outros usuários da congregação."
             UserRole.RESPONSIBLE -> "Ao tornar este irmão Responsável, ele continuará podendo ser designado para territórios e atualizar o progresso de suas designações."

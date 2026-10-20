@@ -1,11 +1,11 @@
 package com.mraphaelpy.terriflow.domain.usecase.territory
 
-import com.mraphaelpy.terriflow.core.util.KmlParser
 import com.mraphaelpy.terriflow.domain.model.EventType
+import com.mraphaelpy.terriflow.domain.model.ImportedTerritory
 import com.mraphaelpy.terriflow.domain.model.Territory
+import com.mraphaelpy.terriflow.domain.model.TerritoryCode
 import com.mraphaelpy.terriflow.domain.model.TerritoryEvent
 import com.mraphaelpy.terriflow.domain.model.TerritoryStatus
-import com.mraphaelpy.terriflow.domain.repository.AuthRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryEventRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
 import java.util.Date
@@ -13,45 +13,38 @@ import java.util.UUID
 import javax.inject.Inject
 
 class ImportTerritoriesUseCase @Inject constructor(
+    private val guard: TerritoryActionGuard,
     private val territoryRepository: TerritoryRepository,
-    private val eventRepository: TerritoryEventRepository,
-    private val authRepository: AuthRepository
+    private val eventRepository: TerritoryEventRepository
 ) {
-    suspend operator fun invoke(items: List<KmlParser.ParsedTerritory>): Int {
-        val user = authRepository.getCurrentUser()
-            ?: throw IllegalStateException("Usuário não autenticado")
-
+    /** Importa os territórios em sequência de código e retorna quantos foram salvos. */
+    suspend operator fun invoke(items: List<ImportedTerritory>): Int {
+        if (items.isEmpty()) return 0
+        val actor = guard.requireCanCreate()
         val now = Date()
-        var imported = 0
 
-        for (parsed in items) {
-            val code = territoryRepository.getNextCode()
+        // Busca o próximo código uma única vez e incrementa localmente,
+        // evitando uma consulta remota (e possíveis códigos repetidos) por item.
+        var nextNumber = TerritoryCode.numberOf(territoryRepository.getNextCode()) ?: 1
+
+        items.forEach { imported ->
+            val code = TerritoryCode.format(nextNumber++)
             val territory = Territory(
                 id = UUID.randomUUID().toString(),
                 code = code,
-                name = parsed.name.ifBlank { "Território $code" },
-                description = parsed.description,
-                boundaryPoints = parsed.boundaryPoints,
-                blockPolygons = parsed.blockPolygons,
-                latitude = parsed.centroid?.lat,
-                longitude = parsed.centroid?.lng,
+                name = imported.name.ifBlank { "Território $code" },
+                description = imported.description,
+                boundaryPoints = imported.boundaryPoints,
+                blockPolygons = imported.blockPolygons,
+                latitude = imported.centroid?.lat,
+                longitude = imported.centroid?.lng,
                 status = TerritoryStatus.AVAILABLE,
                 createdAt = now,
                 updatedAt = now
             )
             val saved = territoryRepository.save(territory)
-            eventRepository.save(
-                TerritoryEvent(
-                    id = UUID.randomUUID().toString(),
-                    territoryId = saved.id,
-                    userId = user.id,
-                    userName = user.name,
-                    type = EventType.CREATED,
-                    timestamp = now
-                )
-            )
-            imported++
+            eventRepository.save(TerritoryEvent.create(saved.id, actor, EventType.CREATED, now))
         }
-        return imported
+        return items.size
     }
 }
