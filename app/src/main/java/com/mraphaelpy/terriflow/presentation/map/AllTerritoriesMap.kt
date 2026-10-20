@@ -1,6 +1,5 @@
 package com.mraphaelpy.terriflow.presentation.map
 
-import android.graphics.drawable.Drawable
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -10,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
@@ -82,7 +82,7 @@ class TerritoryMapState {
     }
 }
 
-private data class RenderKey(val territory: Territory, val highlighted: Boolean, val mine: Boolean)
+private data class RenderKey(val territory: Territory, val color: Color, val highlighted: Boolean, val mine: Boolean)
 
 private class RenderedTerritory(val key: RenderKey, val polygons: List<Polygon>, val marker: Marker?)
 
@@ -90,6 +90,7 @@ private class RenderedTerritory(val key: RenderKey, val polygons: List<Polygon>,
 fun AllTerritoriesMap(
     state: TerritoryMapState,
     territories: List<Territory>,
+    colors: Map<String, Color>,
     onTerritoryClick: (String) -> Unit,
     modifier: Modifier = Modifier,
     highlightId: String? = null,
@@ -100,7 +101,7 @@ fun AllTerritoriesMap(
     val lifecycleOwner = LocalLifecycleOwner.current
     val currentOnClick by rememberUpdatedState(onTerritoryClick)
     val rendered = remember { HashMap<String, RenderedTerritory>() }
-    val iconCache = remember { HashMap<String, Drawable>() }
+    val iconCache = remember { HashMap<String, MarkerIcon>() }
 
     DisposableEffect(lifecycleOwner, locationEnabled) {
         val observer = LifecycleEventObserver { _, event ->
@@ -164,6 +165,7 @@ fun AllTerritoriesMap(
             val desired = territories.associate { territory ->
                 territory.id to RenderKey(
                     territory = territory,
+                    color = colors[territory.id] ?: statusColor(territory.status),
                     highlighted = territory.id == highlightId,
                     mine = currentUserId != null && territory.currentResponsibleId == currentUserId
                 )
@@ -199,7 +201,7 @@ private fun buildPolygons(key: RenderKey, onClick: () -> Unit): List<Polygon> {
         territory.hasBoundary -> listOf(territory.boundaryPoints)
         else -> emptyList()
     }
-    val color = statusColor(territory.status)
+    val color = key.color
     val fillAlpha = when {
         key.highlighted -> 0.45f
         key.mine -> 0.32f
@@ -225,41 +227,34 @@ private fun buildPolygons(key: RenderKey, onClick: () -> Unit): List<Polygon> {
 private fun buildMarker(
     mapView: MapView,
     key: RenderKey,
-    iconCache: MutableMap<String, Drawable>,
+    iconCache: MutableMap<String, MarkerIcon>,
     onClick: () -> Unit
 ): Marker? {
     val territory = key.territory
     val center = territory.center ?: return null
-    val densityScale = mapView.resources.displayMetrics.density / MARKER_REFERENCE_DENSITY
-    val scale = densityScale * when {
-        key.highlighted -> 1.1f
-        key.mine -> 0.9f
-        else -> 0.75f
-    }
-    val iconKey = listOf(territory.code, territory.status, territory.currentResponsibleName, scale, key.highlighted)
-        .joinToString("|")
+    val owner = territory.currentResponsibleName?.let { if (key.mine) "Você" else shortPersonName(it) }
+    val label = markerLabel(territory.code)
+    val iconKey = listOf(key.color.toArgb(), territory.status, label, owner, key.highlighted).joinToString("|")
     val icon = iconCache.getOrPut(iconKey) {
-        createStatusMarkerIcon(
+        createTerritoryMarkerIcon(
             context = mapView.context,
-            color = statusColor(territory.status).toArgb(),
-            code = territory.code,
-            responsibleName = territory.currentResponsibleName,
-            scale = scale,
-            showStar = key.highlighted
+            color = key.color.toArgb(),
+            statusColor = statusColor(territory.status).toArgb(),
+            label = label,
+            ownerLabel = owner,
+            highlighted = key.highlighted
         )
     }
     return Marker(mapView).apply {
         position = GeoPoint(center.lat, center.lng)
-        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+        setAnchor(Marker.ANCHOR_CENTER, icon.anchorY)
         title = territory.displayName
         snippet = territory.status.label()
-        this.icon = icon
+        this.icon = icon.drawable
         infoWindow = null
         setOnMarkerClickListener { _, _ -> onClick(); true }
     }
 }
-
-private const val MARKER_REFERENCE_DENSITY = 3f
 
 private fun List<LatLng>.toClosedGeoPoints(): List<GeoPoint> {
     val points = map { GeoPoint(it.lat, it.lng) }

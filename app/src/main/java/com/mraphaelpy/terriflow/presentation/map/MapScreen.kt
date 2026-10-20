@@ -118,12 +118,14 @@ fun MapScreen(
         }
     }
 
+    val palette = remember(uiState.mappedTerritories) { territoryPalette(uiState.mappedTerritories) }
     val selectedTerritory = uiState.mappedTerritories.firstOrNull { it.id == selectedId }
 
     if (selectedTerritory != null) {
         ModalBottomSheet(onDismissRequest = { selectedId = null }) {
             TerritoryMapCard(
                 territory = selectedTerritory,
+                territoryColor = palette[selectedTerritory.id] ?: statusColor(selectedTerritory.status),
                 isMine = selectedTerritory.currentResponsibleId == uiState.currentUserId,
                 onOpen = {
                     selectedId = null
@@ -137,6 +139,7 @@ fun MapScreen(
         AllTerritoriesMap(
             state = mapState,
             territories = uiState.visibleTerritories,
+            colors = palette,
             highlightId = selectedId,
             currentUserId = uiState.currentUserId,
             locationEnabled = hasLocationPermission,
@@ -382,6 +385,7 @@ private fun MapMessageCard(
 @Composable
 private fun TerritoryMapCard(
     territory: Territory,
+    territoryColor: Color,
     isMine: Boolean,
     onOpen: () -> Unit
 ) {
@@ -397,6 +401,12 @@ private fun TerritoryMapCard(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(
+                modifier = Modifier
+                    .padding(top = 4.dp)
+                    .size(14.dp)
+                    .background(territoryColor, CircleShape)
+            )
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     territory.code,

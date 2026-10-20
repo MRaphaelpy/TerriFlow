@@ -3,18 +3,23 @@ package com.mraphaelpy.terriflow.presentation.map
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
+import android.graphics.Typeface
+import android.graphics.drawable.Drawable
 import android.net.Uri
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.net.toUri
+import com.mraphaelpy.terriflow.domain.model.Territory
 import com.mraphaelpy.terriflow.domain.model.TerritoryCode
 import com.mraphaelpy.terriflow.domain.model.TerritoryStatus
 import com.mraphaelpy.terriflow.domain.model.label
+import android.graphics.Color as AndroidColor
 
 fun statusColor(status: TerritoryStatus): Color = when (status) {
     TerritoryStatus.AVAILABLE   -> Color(0xFF4CAF50)
@@ -26,97 +31,142 @@ fun statusColor(status: TerritoryStatus): Color = when (status) {
     TerritoryStatus.ARCHIVED    -> Color(0xFF607D8B)
 }
 
-private fun statusColorInt(status: TerritoryStatus): Int = statusColor(status).toArgb()
+fun territoryPalette(territories: List<Territory>): Map<String, Color> =
+    territories
+        .sortedWith(compareBy({ TerritoryCode.numberOf(it.code) ?: Int.MAX_VALUE }, { it.code }, { it.id }))
+        .withIndex()
+        .associate { (index, territory) ->
+            val hue = (index * GOLDEN_ANGLE_DEGREES) % 360f
+            val lightness = if (index % 2 == 0) 0.42f else 0.5f
+            territory.id to Color.hsl(hue, 0.7f, lightness)
+        }
 
-internal fun createStatusMarkerIcon(
+private const val GOLDEN_ANGLE_DEGREES = 137.508f
+
+internal class MarkerIcon(val drawable: Drawable, val anchorY: Float)
+
+internal fun createTerritoryMarkerIcon(
     context: Context,
     color: Int,
-    code: String,
-    responsibleName: String? = null,
-    scale: Float = 1.0f,
-    showStar: Boolean = false
-): android.graphics.drawable.Drawable {
-    val baseW = 140
-    val hasResponsible = !responsibleName.isNullOrEmpty()
-    val baseH = if (hasResponsible) 175 else 140
-    val w = (baseW * scale).toInt()
-    val h = (baseH * scale).toInt()
-    val bodyH = ((h - 35 * scale)).toFloat()
+    statusColor: Int,
+    label: String,
+    ownerLabel: String?,
+    highlighted: Boolean
+): MarkerIcon {
+    val density = context.resources.displayMetrics.density
+    fun dp(value: Float) = value * density
 
-    val bitmap = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+    val radius = dp(if (highlighted) 20f else 15f)
+    val ring = dp(if (highlighted) 3f else 2.5f)
+    val tail = dp(7f)
+    val halo = if (highlighted) dp(6f) else 0f
+    val pad = dp(4f) + halo
+
+    val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        this.color = AndroidColor.WHITE
+        typeface = Typeface.DEFAULT_BOLD
+        textAlign = Paint.Align.CENTER
+        textSize = dp(
+            when {
+                label.length <= 2 -> if (highlighted) 16f else 13f
+                label.length == 3 -> if (highlighted) 13f else 11f
+                else -> 9f
+            }
+        )
+    }
+    val ownerPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        this.color = 0xFF202124.toInt()
+        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        textAlign = Paint.Align.CENTER
+        textSize = dp(10.5f)
+    }
+
+    val ownerText = ownerLabel?.let { ellipsize(it, ownerPaint, dp(90f)) }
+    val pillPaddingH = dp(6f)
+    val pillHeight = ownerText?.let { ownerPaint.textSize + dp(6f) } ?: 0f
+    val pillWidth = ownerText?.let { ownerPaint.measureText(it) + pillPaddingH * 2 } ?: 0f
+    val pillGap = if (ownerText != null) dp(2f) else 0f
+
+    val width = maxOf(radius * 2 + pad * 2, pillWidth + dp(4f) * 2)
+    val tipY = pad + radius * 2 + tail
+    val height = tipY + pillGap + pillHeight + dp(4f)
+
+    val bitmap = Bitmap.createBitmap(width.toInt(), height.toInt(), Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
+    val cx = width / 2f
+    val cy = pad + radius
 
-    val strokeWidth = 5f * scale
-    val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color }
-    val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = 0xFFFFFFFF.toInt()
-        style = Paint.Style.STROKE
-        this.strokeWidth = strokeWidth
-    }
-    val codePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = 0xFFFFFFFF.toInt()
-        textSize = 26f * scale
-        typeface = android.graphics.Typeface.DEFAULT_BOLD
-        textAlign = Paint.Align.CENTER
-    }
-    val namePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        this.color = 0xFFFFFFFF.toInt()
-        textSize = 18f * scale
-        textAlign = Paint.Align.CENTER
+    if (highlighted) {
+        val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = withAlpha(color, 90) }
+        canvas.drawCircle(cx, cy, radius + halo, haloPaint)
     }
 
-    if (showStar) {
-        val highlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.color = 0xFFFFD700.toInt()
-            style = Paint.Style.STROKE
-            this.strokeWidth = 6f * scale
-        }
-        val rect2 = android.graphics.RectF(2f, 2f, w - 2f, bodyH + 2f)
-        canvas.drawRoundRect(rect2, 22f, 22f, highlightPaint)
+    val bodyPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        this.color = color
+        setShadowLayer(dp(3f), 0f, dp(1.5f), 0x55000000)
     }
-
-    val rect = android.graphics.RectF(4f * scale, 4f * scale, w - 4f * scale, bodyH)
-    canvas.drawRoundRect(rect, 20f * scale, 20f * scale, bodyPaint)
-    canvas.drawRoundRect(rect, 20f * scale, 20f * scale, strokePaint)
-
-    val ptrW = 14f * scale
-    val triPath = android.graphics.Path().apply {
-        moveTo(w / 2f - ptrW, bodyH)
-        lineTo(w / 2f + ptrW, bodyH)
-        lineTo(w / 2f, h.toFloat() - 4f * scale)
+    val pin = Path().apply {
+        addCircle(cx, cy, radius, Path.Direction.CW)
+        moveTo(cx - radius * 0.55f, cy + radius * 0.8f)
+        lineTo(cx, tipY)
+        lineTo(cx + radius * 0.55f, cy + radius * 0.8f)
         close()
     }
-    canvas.drawPath(triPath, bodyPaint)
+    canvas.drawPath(pin, bodyPaint)
 
-    val shortCode = markerLabel(code)
-    if (hasResponsible) {
-        canvas.drawText(shortCode, w / 2f, bodyH / 2f - 4f * scale, codePaint)
-        canvas.drawLine(
-            16f * scale, bodyH / 2f + 8f * scale,
-            w - 16f * scale, bodyH / 2f + 8f * scale,
-            strokePaint.apply { this.strokeWidth = 1f * scale }
-        )
-        val initials = responsibleName.split(" ")
-            .take(2).joinToString(" ") { it.take(1).uppercase() + it.drop(1).take(4) }
-        canvas.drawText(initials, w / 2f, bodyH - 10f * scale, namePaint)
-    } else {
-        canvas.drawText(shortCode, w / 2f, bodyH / 2f + codePaint.textSize / 3f, codePaint)
+    val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        this.color = AndroidColor.WHITE
+        style = Paint.Style.STROKE
+        strokeWidth = ring
     }
+    canvas.drawCircle(cx, cy, radius - ring / 2f, ringPaint)
 
-    if (showStar) {
-        val starPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = 0xFFFFD700.toInt() }
-        canvas.drawCircle(w - 14f * scale, 14f * scale, 10f * scale, starPaint)
-        val textPaint2 = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            this.color = 0xFF333333.toInt()
-            textSize = 14f * scale
-            textAlign = Paint.Align.CENTER
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
+    canvas.drawText(label, cx, cy - (labelPaint.descent() + labelPaint.ascent()) / 2f, labelPaint)
+
+    val dotRadius = dp(if (highlighted) 6f else 5f)
+    val dotX = cx + radius * 0.72f
+    val dotY = cy - radius * 0.72f
+    canvas.drawCircle(dotX, dotY, dotRadius + dp(1.5f), Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = AndroidColor.WHITE })
+    canvas.drawCircle(dotX, dotY, dotRadius, Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = statusColor })
+
+    if (ownerText != null) {
+        val top = tipY + pillGap
+        val rect = RectF(cx - pillWidth / 2f, top, cx + pillWidth / 2f, top + pillHeight)
+        val pillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = AndroidColor.WHITE
+            setShadowLayer(dp(2f), 0f, dp(1f), 0x44000000)
         }
-        canvas.drawText("★", w - 14f * scale, 14f * scale + textPaint2.textSize / 3f, textPaint2)
+        canvas.drawRoundRect(rect, pillHeight / 2f, pillHeight / 2f, pillPaint)
+        val accent = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.color = color
+            style = Paint.Style.STROKE
+            strokeWidth = dp(1.2f)
+        }
+        canvas.drawRoundRect(rect, pillHeight / 2f, pillHeight / 2f, accent)
+        canvas.drawText(ownerText, cx, rect.centerY() - (ownerPaint.descent() + ownerPaint.ascent()) / 2f, ownerPaint)
     }
 
-    return bitmap.toDrawable(context.resources)
+    return MarkerIcon(bitmap.toDrawable(context.resources), anchorY = tipY / height)
 }
+
+internal fun shortPersonName(fullName: String): String {
+    val parts = fullName.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }
+    return when {
+        parts.isEmpty() -> ""
+        parts.size == 1 -> parts.first()
+        else -> "${parts.first()} ${parts.last().first().uppercaseChar()}."
+    }
+}
+
+private fun ellipsize(text: String, paint: Paint, maxWidth: Float): String {
+    if (paint.measureText(text) <= maxWidth) return text
+    var end = text.length
+    while (end > 1 && paint.measureText(text.substring(0, end) + "…") > maxWidth) end--
+    return text.substring(0, end).trimEnd() + "…"
+}
+
+private fun withAlpha(color: Int, alpha: Int): Int =
+    AndroidColor.argb(alpha, AndroidColor.red(color), AndroidColor.green(color), AndroidColor.blue(color))
 
 internal fun markerLabel(code: String): String =
     TerritoryCode.numberOf(code)?.toString() ?: code.trim().take(MAX_CUSTOM_LABEL_LENGTH)
