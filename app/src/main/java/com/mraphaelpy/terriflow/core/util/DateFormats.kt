@@ -9,5 +9,6 @@ object DateFormats {
     fun shortDateTime() = SimpleDateFormat("dd/MM HH:mm", PT_BR)
     fun shortDate()     = SimpleDateFormat("dd/MM/yy", PT_BR)
     fun fullDate()      = SimpleDateFormat("dd/MM/yyyy", PT_BR)
+    fun time()          = SimpleDateFormat("HH:mm", PT_BR)
     fun fullDateTime()  = SimpleDateFormat("dd/MM/yy HH:mm", PT_BR)
 }

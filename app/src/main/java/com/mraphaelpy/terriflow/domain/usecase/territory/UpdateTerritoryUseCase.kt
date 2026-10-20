@@ -61,11 +61,20 @@ class UpdateTerritoryUseCase @Inject constructor(
                 type = EventType.UPDATED,
                 timestamp = now,
                 extra = buildMap {
-                    if (existing.code != updated.code) put("code", updated.code)
-                    if (existing.name != updated.name) put("name", updated.name)
-                    if (existing.location != updated.location) put("location", updated.location)
-                    updated.latitude?.let { put("lat", it.toString()) }
-                    updated.longitude?.let { put("lng", it.toString()) }
+                    fun change(key: String, before: String, after: String) {
+                        if (before == after) return
+                        put(key, after)
+                        put("${key}From", before)
+                    }
+                    change("code", existing.code, updated.code)
+                    change("name", existing.name, updated.name)
+                    change("location", existing.location, updated.location)
+                    change("description", existing.description, updated.description)
+                    change("notes", existing.notes, updated.notes)
+                    if (existing.latitude != updated.latitude || existing.longitude != updated.longitude) {
+                        put("pinChanged", "true")
+                    }
+                    if (existing.boundaryPoints != updated.boundaryPoints) put("boundaryChanged", "true")
                 }
             )
         )
