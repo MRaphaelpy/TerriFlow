@@ -1,10 +1,10 @@
-package com.mraphaelpy.terriflow.presentation.map
+package com.mraphaelpy.terriflow.presentation.components
 
 import com.mraphaelpy.terriflow.domain.model.Territory
 import com.mraphaelpy.terriflow.domain.model.TerritoryStatus
 import java.text.Normalizer
 
-data class MapFilter(
+data class TerritoryFilter(
     val status: TerritoryStatus? = null,
     val onlyMine: Boolean = false,
     val query: String = ""

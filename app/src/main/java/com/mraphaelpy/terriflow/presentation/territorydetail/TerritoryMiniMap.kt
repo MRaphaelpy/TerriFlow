@@ -39,8 +39,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.mraphaelpy.terriflow.core.util.MapColors
 import com.mraphaelpy.terriflow.domain.model.TerritoryStatus
 import com.mraphaelpy.terriflow.domain.model.label
+import com.mraphaelpy.terriflow.presentation.components.statusColor
 import com.mraphaelpy.terriflow.presentation.map.openInGoogleMaps
-import com.mraphaelpy.terriflow.presentation.map.statusColor
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.BoundingBox

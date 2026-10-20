@@ -79,6 +79,9 @@ import com.mraphaelpy.terriflow.domain.model.Territory
 import com.mraphaelpy.terriflow.domain.model.TerritoryStatus
 import com.mraphaelpy.terriflow.domain.model.center
 import com.mraphaelpy.terriflow.domain.model.label
+import com.mraphaelpy.terriflow.presentation.components.PillSearchField
+import com.mraphaelpy.terriflow.presentation.components.TerritoryFilterChips
+import com.mraphaelpy.terriflow.presentation.components.statusColor
 import kotlinx.coroutines.launch
 
 private val BottomNavClearance = 112.dp
@@ -118,7 +121,7 @@ fun MapScreen(
         }
     }
 
-    val palette = remember(uiState.mappedTerritories) { territoryPalette(uiState.mappedTerritories) }
+    val palette = uiState.palette
     val selectedTerritory = uiState.mappedTerritories.firstOrNull { it.id == selectedId }
 
     if (selectedTerritory != null) {
@@ -153,20 +156,34 @@ fun MapScreen(
                 .padding(top = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            MapSearchBar(
+            PillSearchField(
                 query = uiState.filter.query,
-                visibleCount = uiState.visibleTerritories.size,
-                totalCount = uiState.mappedTerritories.size,
-                showBack = highlightId != null,
-                onBack = onNavigateBack,
                 onQueryChange = viewModel::updateQuery,
+                placeholder = "Buscar código, nome, rua ou responsável",
+                trailingInfo = uiState.mappedTerritories.size.takeIf { it > 0 }?.let { total ->
+                    val visible = uiState.visibleTerritories.size
+                    if (visible == total) "$total" else "$visible/$total"
+                },
+                shadowElevation = 6.dp,
+                leadingIcon = {
+                    if (highlightId != null) {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
+                        }
+                    } else {
+                        Icon(Icons.Default.Search, contentDescription = null)
+                    }
+                },
                 modifier = Modifier.padding(horizontal = 12.dp)
             )
-            MapFilterChips(
-                uiState = uiState,
+            TerritoryFilterChips(
+                filter = uiState.filter,
+                statusCounts = uiState.statusCounts,
+                myCount = uiState.myCount,
                 onAllClick = viewModel::clearStatus,
                 onMineClick = viewModel::toggleOnlyMine,
-                onStatusClick = viewModel::toggleStatus
+                onStatusClick = viewModel::toggleStatus,
+                elevated = true
             )
         }
 
@@ -228,127 +245,6 @@ fun MapScreen(
                 .align(Alignment.BottomCenter)
                 .padding(bottom = BottomNavClearance)
         )
-    }
-}
-
-@Composable
-private fun MapSearchBar(
-    query: String,
-    visibleCount: Int,
-    totalCount: Int,
-    showBack: Boolean,
-    onBack: () -> Unit,
-    onQueryChange: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val focusManager = LocalFocusManager.current
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        shadowElevation = 6.dp
-    ) {
-        TextField(
-            value = query,
-            onValueChange = onQueryChange,
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            placeholder = {
-                Text(
-                    "Buscar código, nome, rua ou responsável",
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            },
-            leadingIcon = {
-                if (showBack) {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
-                    }
-                } else {
-                    Icon(Icons.Default.Search, contentDescription = null)
-                }
-            },
-            trailingIcon = {
-                if (query.isNotEmpty()) {
-                    IconButton(onClick = { onQueryChange("") }) {
-                        Icon(Icons.Default.Close, contentDescription = "Limpar busca")
-                    }
-                } else if (totalCount > 0) {
-                    Text(
-                        if (visibleCount == totalCount) "$totalCount" else "$visibleCount/$totalCount",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(end = 16.dp)
-                    )
-                }
-            },
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent
-            )
-        )
-    }
-}
-
-@Composable
-private fun MapFilterChips(
-    uiState: MapUiState,
-    onAllClick: () -> Unit,
-    onMineClick: () -> Unit,
-    onStatusClick: (TerritoryStatus) -> Unit
-) {
-    val chipColors = FilterChipDefaults.filterChipColors(
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-        selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer
-    )
-    val statuses = TerritoryStatus.entries.filter { (uiState.statusCounts[it] ?: 0) > 0 }
-
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        item {
-            FilterChip(
-                selected = uiState.filter.status == null,
-                onClick = onAllClick,
-                label = { Text("Todos") },
-                colors = chipColors,
-                elevation = FilterChipDefaults.filterChipElevation(elevation = 2.dp)
-            )
-        }
-        if (uiState.myCount > 0) {
-            item {
-                FilterChip(
-                    selected = uiState.filter.onlyMine,
-                    onClick = onMineClick,
-                    label = { Text("Meus (${uiState.myCount})") },
-                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                    colors = chipColors,
-                    elevation = FilterChipDefaults.filterChipElevation(elevation = 2.dp)
-                )
-            }
-        }
-        items(statuses, key = { it.name }) { status ->
-            FilterChip(
-                selected = uiState.filter.status == status,
-                onClick = { onStatusClick(status) },
-                label = { Text("${status.label()} (${uiState.statusCounts[status] ?: 0})") },
-                leadingIcon = {
-                    Box(
-                        modifier = Modifier
-                            .size(10.dp)
-                            .background(statusColor(status), CircleShape)
-                    )
-                },
-                colors = chipColors,
-                elevation = FilterChipDefaults.filterChipElevation(elevation = 2.dp)
-            )
-        }
     }
 }
 

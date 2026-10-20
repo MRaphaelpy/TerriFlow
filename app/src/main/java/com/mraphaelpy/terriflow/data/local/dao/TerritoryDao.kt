@@ -26,21 +26,6 @@ interface TerritoryDao {
     @Query("SELECT * FROM territories WHERE status = :status AND deletedAt IS NULL ORDER BY code ASC")
     fun observeByStatus(status: String): Flow<List<TerritoryEntity>>
 
-    @Query("""
-        SELECT * FROM territories
-        WHERE deletedAt IS NULL
-        AND (
-            (:query = '') OR
-            (code LIKE '%' || :query || '%') OR
-            (name LIKE '%' || :query || '%') OR
-            (location LIKE '%' || :query || '%')
-        )
-        AND (:status = '' OR status = :status)
-        AND (:responsibleId = '' OR currentResponsibleId = :responsibleId)
-        ORDER BY code ASC
-    """)
-    fun search(query: String, status: String, responsibleId: String): Flow<List<TerritoryEntity>>
-
     @Query("SELECT * FROM territories WHERE synced = 0 AND deletedAt IS NULL")
     suspend fun getPending(): List<TerritoryEntity>
 

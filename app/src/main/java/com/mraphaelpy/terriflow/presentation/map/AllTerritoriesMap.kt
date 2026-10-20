@@ -23,6 +23,7 @@ import com.mraphaelpy.terriflow.domain.model.bounds
 import com.mraphaelpy.terriflow.domain.model.center
 import com.mraphaelpy.terriflow.domain.model.displayName
 import com.mraphaelpy.terriflow.domain.model.label
+import com.mraphaelpy.terriflow.presentation.components.statusColor
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.BoundingBox

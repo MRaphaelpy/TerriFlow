@@ -43,9 +43,6 @@ class TerritoryRepositoryImpl @Inject constructor(
     override fun observeByStatus(status: TerritoryStatus): Flow<List<Territory>> =
         territoryDao.observeByStatus(status.name).map { list -> list.map { it.toDomain() } }
 
-    override fun search(query: String, status: String, responsibleId: String): Flow<List<Territory>> =
-        territoryDao.search(query, status, responsibleId).map { list -> list.map { it.toDomain() } }
-
     override fun countByStatus(status: TerritoryStatus): Flow<Int> =
         territoryDao.countByStatus(status.name)
 

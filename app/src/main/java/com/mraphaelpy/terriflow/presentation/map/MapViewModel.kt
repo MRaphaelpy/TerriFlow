@@ -1,5 +1,6 @@
 package com.mraphaelpy.terriflow.presentation.map
 
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mraphaelpy.terriflow.domain.model.Territory
@@ -7,6 +8,8 @@ import com.mraphaelpy.terriflow.domain.model.TerritoryStatus
 import com.mraphaelpy.terriflow.domain.model.isMapped
 import com.mraphaelpy.terriflow.domain.repository.AuthRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
+import com.mraphaelpy.terriflow.presentation.components.TerritoryFilter
+import com.mraphaelpy.terriflow.presentation.components.territoryPalette
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -24,7 +27,8 @@ data class MapUiState(
     val statusCounts: Map<TerritoryStatus, Int> = emptyMap(),
     val myCount: Int = 0,
     val currentUserId: String? = null,
-    val filter: MapFilter = MapFilter(),
+    val filter: TerritoryFilter = TerritoryFilter(),
+    val palette: Map<String, Color> = emptyMap(),
     val isLoading: Boolean = true
 )
 
@@ -34,7 +38,7 @@ class MapViewModel @Inject constructor(
     authRepository: AuthRepository
 ) : ViewModel() {
 
-    private val filter = MutableStateFlow(MapFilter())
+    private val filter = MutableStateFlow(TerritoryFilter())
 
     val uiState: StateFlow<MapUiState> = combine(
         territoryRepository.observeAll(),
@@ -50,6 +54,7 @@ class MapViewModel @Inject constructor(
             myCount = mapped.count { user != null && it.currentResponsibleId == user.id },
             currentUserId = user?.id,
             filter = currentFilter,
+            palette = territoryPalette(all),
             isLoading = false
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MapUiState())
@@ -68,6 +73,6 @@ class MapViewModel @Inject constructor(
     fun updateQuery(query: String) = filter.update { it.copy(query = query) }
 
     fun clearFilters() {
-        filter.value = MapFilter()
+        filter.value = TerritoryFilter()
     }
 }

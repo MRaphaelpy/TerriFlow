@@ -10,7 +10,6 @@ interface TerritoryRepository {
     fun observeById(id: String): Flow<Territory?>
     fun observeByStatus(status: TerritoryStatus): Flow<List<Territory>>
 
-    fun search(query: String, status: String, responsibleId: String): Flow<List<Territory>>
     fun countByStatus(status: TerritoryStatus): Flow<Int>
 
     suspend fun getById(id: String): Territory?
