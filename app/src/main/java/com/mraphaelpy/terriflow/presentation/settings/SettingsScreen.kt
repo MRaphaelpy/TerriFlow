@@ -66,7 +66,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mraphaelpy.terriflow.BuildConfig
 import com.mraphaelpy.terriflow.core.updater.UpdateDialog
-import com.mraphaelpy.terriflow.domain.model.UserRole
 import com.mraphaelpy.terriflow.domain.model.label
 import com.mraphaelpy.terriflow.domain.repository.AppColor
 import com.mraphaelpy.terriflow.domain.repository.ThemeMode
