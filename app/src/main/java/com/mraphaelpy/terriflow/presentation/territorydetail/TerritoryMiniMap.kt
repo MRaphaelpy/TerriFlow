@@ -17,6 +17,7 @@ import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Fullscreen
 import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,6 +38,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import com.mraphaelpy.terriflow.core.report.MapImageSharer
 import com.mraphaelpy.terriflow.domain.model.label
 import com.mraphaelpy.terriflow.presentation.map.openInGoogleMaps
 import org.osmdroid.config.Configuration
@@ -221,6 +223,23 @@ internal fun TerritoryMiniMap(
                             modifier = Modifier.height(28.dp)
                         )
                         Spacer(Modifier.width(2.dp))
+                    }
+                    if (hasLocation || hasBoundary || hasBlocks) {
+                        IconButton(
+                            onClick = {
+                                detailMapView?.let { mapView ->
+                                    val subtitle = if (hasBlocks) {
+                                        "${completedBlocks.count { it in blockPolygons.indices }} de ${blockPolygons.size} quadras feitas"
+                                    } else {
+                                        "Gerado pelo TerriFlow"
+                                    }
+                                    MapImageSharer.share(context, mapView, label, subtitle)
+                                }
+                            },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(Icons.Default.Share, contentDescription = "Compartilhar mapa", modifier = Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+                        }
                     }
                     if (hasLocation || hasBoundary) {
                         IconButton(
