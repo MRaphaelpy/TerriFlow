@@ -1,9 +1,12 @@
 package com.mraphaelpy.terriflow.presentation.settings
 
+import android.content.Intent
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,7 +15,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -22,33 +24,39 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeFlexibleTopAppBar
+import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,15 +65,24 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.mraphaelpy.terriflow.BuildConfig
 import com.mraphaelpy.terriflow.core.updater.UpdateDialog
+import com.mraphaelpy.terriflow.domain.model.Congregation
+import com.mraphaelpy.terriflow.domain.model.User
 import com.mraphaelpy.terriflow.domain.model.label
 import com.mraphaelpy.terriflow.domain.repository.AppColor
 import com.mraphaelpy.terriflow.domain.repository.ThemeMode
@@ -75,34 +92,31 @@ import com.mraphaelpy.terriflow.ui.theme.TerriGreen
 import com.mraphaelpy.terriflow.ui.theme.TerriOrange
 import com.mraphaelpy.terriflow.ui.theme.TerriPurple
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    val clipboardManager = LocalClipboardManager.current
-
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     var showEditNameDialog by remember { mutableStateOf(false) }
-
-    val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri ->
-        if (uri != null) {
-            viewModel.updateProfilePicture(uri)
-        }
+    val photoPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) viewModel.updateProfilePicture(uri)
     }
+    val pickPhoto = { photoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            LargeFlexibleTopAppBar(
                 title = { Text("Configurações") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
                     }
-                }
+                },
+                scrollBehavior = scrollBehavior
             )
         }
     ) { padding ->
@@ -111,459 +125,289 @@ fun SettingsScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-
             uiState.currentUser?.let { user ->
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "Meu Perfil",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Box(contentAlignment = Alignment.BottomEnd) {
-                                UserAvatar(
-                                    user = user,
-                                    size = 56.dp,
-                                    modifier = Modifier.clickable {
-                                        photoPickerLauncher.launch(
-                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                        )
-                                    }
-                                )
-                                Surface(
-                                    shape = CircleShape,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp).offset(x = 2.dp, y = 2.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.CameraAlt,
-                                        contentDescription = "Trocar foto",
-                                        tint = MaterialTheme.colorScheme.onPrimary,
-                                        modifier = Modifier.padding(3.dp)
-                                    )
-                                }
-                            }
-
-                            Spacer(Modifier.width(16.dp))
-
-                            Column(modifier = Modifier.weight(1f)) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Text(
-                                        text = user.name.ifBlank { "Sem nome" },
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    IconButton(
-                                        onClick = { showEditNameDialog = true },
-                                        modifier = Modifier.size(28.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Edit,
-                                            contentDescription = "Editar nome",
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                }
-
-                                if (user.email.isNotBlank()) {
-                                    Text(
-                                        text = user.email,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-
-                                Spacer(Modifier.height(6.dp))
-
-                                AssistChip(
-                                    onClick = {},
-                                    label = { Text(user.role.label()) },
-                                    border = null,
-                                    modifier = Modifier.height(24.dp)
-                                )
-                            }
-                        }
-                    }
-                }
+                ProfileCard(user = user, onChangePhoto = pickPhoto, onEditName = { showEditNameDialog = true })
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = "Minha Congregação",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
+            SectionTitle("Congregação")
+            CongregationCard(uiState.congregation, uiState.congregationLoading)
 
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                    )
-                ) {
-                    if (uiState.congregationLoading) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(24.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                        }
-                    } else {
-                        val congregation = uiState.congregation
-                        if (congregation != null) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Icon(
-                                        Icons.Default.Groups,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(28.dp)
-                                    )
-                                    Text(
-                                        congregation.name,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                }
-
-                                Spacer(Modifier.height(12.dp))
-                                HorizontalDivider()
-                                Spacer(Modifier.height(12.dp))
-
-                                Text(
-                                    "Código de acesso",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Spacer(Modifier.height(4.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Text(
-                                        congregation.code,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    FilledTonalIconButton(
-                                        onClick = {
-                                            clipboardManager.setText(
-                                                AnnotatedString(congregation.code)
-                                            )
-                                        }
-                                    ) {
-                                        Icon(
-                                            Icons.Default.ContentCopy,
-                                            contentDescription = "Copiar código"
-                                        )
-                                    }
-                                }
-                                Spacer(Modifier.height(4.dp))
-                                Text(
-                                    "Compartilhe este código com os irmãos para que eles possam entrar no app.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        } else {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(24.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    "Nenhuma congregação vinculada",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                }
+            SectionTitle("Aparência")
+            SettingsCard {
+                Text("Tema", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                ThemeSelector(selected = uiState.themeMode, onSelect = viewModel::updateThemeMode)
+                Spacer(Modifier.size(4.dp))
+                Text("Cor de destaque", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                ColorSelector(selected = uiState.appColor, onSelect = viewModel::updateAppColor)
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = "Tema do Aplicativo",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                    )
-                ) {
-                    Column(modifier = Modifier.padding(8.dp)) {
-                        ThemeOptionRow(
-                            label = "Seguir sistema",
-                            selected = uiState.themeMode == ThemeMode.SYSTEM,
-                            onClick = { viewModel.updateThemeMode(ThemeMode.SYSTEM) }
-                        )
-                        ThemeOptionRow(
-                            label = "Modo Claro",
-                            selected = uiState.themeMode == ThemeMode.LIGHT,
-                            onClick = { viewModel.updateThemeMode(ThemeMode.LIGHT) }
-                        )
-                        ThemeOptionRow(
-                            label = "Modo Escuro",
-                            selected = uiState.themeMode == ThemeMode.DARK,
-                            onClick = { viewModel.updateThemeMode(ThemeMode.DARK) }
-                        )
-                    }
-                }
-            }
-
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(
-                    text = "Cores",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
-                )
-
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly
-                    ) {
-                        ColorOption(
-                            color = TerriGreen,
-                            selected = uiState.appColor == AppColor.DEFAULT,
-                            onClick = { viewModel.updateAppColor(AppColor.DEFAULT) }
-                        )
-                        ColorOption(
-                            color = TerriBlue,
-                            selected = uiState.appColor == AppColor.BLUE,
-                            onClick = { viewModel.updateAppColor(AppColor.BLUE) }
-                        )
-                        ColorOption(
-                            color = TerriPurple,
-                            selected = uiState.appColor == AppColor.PURPLE,
-                            onClick = { viewModel.updateAppColor(AppColor.PURPLE) }
-                        )
-                        ColorOption(
-                            color = TerriOrange,
-                            selected = uiState.appColor == AppColor.ORANGE,
-                            onClick = { viewModel.updateAppColor(AppColor.ORANGE) }
-                        )
-                    }
-                }
-            }
-
-            ElevatedCard(
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.extraLarge
-            ) {
-                Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.SystemUpdate,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Text(
-                            text = "Versão do Aplicativo",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-
-                    Text(
-                        text = "Versão instalada: v${BuildConfig.VERSION_NAME}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-
-                    uiState.updateMessage?.let { msg ->
-                        Surface(
-                            shape = MaterialTheme.shapes.medium,
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = msg,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.padding(12.dp)
-                            )
-                        }
-                    }
-
-                    Button(
-                        onClick = { viewModel.checkForUpdates() },
-                        enabled = !uiState.isCheckingUpdate,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.medium
-                    ) {
-                        if (uiState.isCheckingUpdate) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(18.dp),
-                                strokeWidth = 2.dp,
-                                color = MaterialTheme.colorScheme.onPrimary
-                            )
-                            Spacer(Modifier.width(8.dp))
-                            Text("Verificando...")
-                        } else {
-                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text("Verificar Atualizações")
-                        }
-                    }
-                }
-            }
+            SectionTitle("Aplicativo")
+            UpdateCard(
+                version = viewModel.updateManager.currentVersion,
+                message = uiState.updateMessage,
+                isChecking = uiState.isCheckingUpdate,
+                onCheck = viewModel::checkForUpdates
+            )
         }
     }
 
     uiState.availableUpdate?.let { updateInfo ->
         UpdateDialog(
             updateInfo = updateInfo,
-            onDismiss = { viewModel.dismissUpdateDialog() },
+            onDismiss = viewModel::dismissUpdateDialog,
             updateManager = viewModel.updateManager
         )
     }
 
-    if (showEditNameDialog && uiState.currentUser != null) {
-        val currentUser = uiState.currentUser!!
-        var tempName by remember { mutableStateOf(currentUser.name) }
-        var isError by remember { mutableStateOf(false) }
-
-        AlertDialog(
-            onDismissRequest = { showEditNameDialog = false },
-            icon = {
-                Icon(
-                    imageVector = Icons.Default.Edit,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(32.dp)
-                )
+    val user = uiState.currentUser
+    if (showEditNameDialog && user != null) {
+        EditNameDialog(
+            currentName = user.name,
+            onSave = {
+                viewModel.updateMyName(it)
+                showEditNameDialog = false
             },
-            title = { Text("Editar Meu Nome") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "Altere o seu nome de exibição no aplicativo:",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    OutlinedTextField(
-                        value = tempName,
-                        onValueChange = {
-                            tempName = it
-                            isError = it.isBlank()
-                        },
-                        label = { Text("Nome completo") },
-                        singleLine = true,
-                        isError = isError,
-                        supportingText = {
-                            if (isError) Text("O nome não pode ficar vazio")
-                        },
-                        shape = MaterialTheme.shapes.medium,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (tempName.isNotBlank()) {
-                            viewModel.updateMyName(tempName)
-                            showEditNameDialog = false
-                        } else {
-                            isError = true
-                        }
-                    },
-                    enabled = tempName.isNotBlank() && tempName.trim() != currentUser.name
-                ) {
-                    Text("Salvar")
-                }
-            },
-            dismissButton = {
-                OutlinedButton(onClick = { showEditNameDialog = false }) {
-                    Text("Cancelar")
-                }
-            }
+            onDismiss = { showEditNameDialog = false }
         )
     }
 }
 
 @Composable
-private fun ThemeOptionRow(label: String, selected: Boolean, onClick: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.medium)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        RadioButton(selected = selected, onClick = onClick)
-        Spacer(Modifier.width(16.dp))
-        Text(text = label, style = MaterialTheme.typography.bodyLarge)
+private fun SectionTitle(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.titleSmall,
+        fontWeight = FontWeight.SemiBold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = 8.dp, top = 12.dp)
+    )
+}
+
+@Composable
+private fun SettingsCard(content: @Composable () -> Unit) {
+    Surface(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.surfaceContainer) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { content() }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ProfileCard(user: User, onChangePhoto: () -> Unit, onEditName: () -> Unit) {
+    Surface(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.primaryContainer) {
+        Column(
+            modifier = Modifier.padding(24.dp).fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Box(contentAlignment = Alignment.BottomEnd, modifier = Modifier.clickable(onClick = onChangePhoto)) {
+                UserAvatar(user = user, size = 96.dp)
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .offset(x = 4.dp, y = 4.dp)
+                        .background(MaterialTheme.colorScheme.primary, MaterialShapes.Cookie6Sided.toShape()),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.CameraAlt, contentDescription = "Trocar foto", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(18.dp))
+                }
+            }
+            Text(
+                user.name.ifBlank { "Sem nome" },
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                textAlign = TextAlign.Center
+            )
+            if (user.email.isNotBlank()) {
+                Text(user.email, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+            }
+            Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primary) {
+                Text(
+                    user.role.label(),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+            }
+            FilledTonalButton(onClick = onEditName, modifier = Modifier.padding(top = 4.dp)) {
+                Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Editar nome")
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun CongregationCard(congregation: Congregation?, isLoading: Boolean) {
+    val clipboard = LocalClipboardManager.current
+    val context = LocalContext.current
+    SettingsCard {
+        when {
+            isLoading -> Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { LoadingIndicator() }
+            congregation == null -> Text("Nenhuma congregação vinculada", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            else -> {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Icon(Icons.Default.Groups, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Text(congregation.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                }
+                Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.fillMaxWidth()) {
+                    Row(modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 8.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Código de acesso", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(congregation.code, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        }
+                        FilledTonalIconButton(onClick = { clipboard.setText(AnnotatedString(congregation.code)) }) {
+                            Icon(Icons.Default.ContentCopy, contentDescription = "Copiar código")
+                        }
+                        FilledTonalIconButton(onClick = {
+                            val text = "Entre na congregação ${congregation.name} no TerriFlow usando o código: ${congregation.code}"
+                            context.startActivity(
+                                Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), "Compartilhar código")
+                            )
+                        }) {
+                            Icon(Icons.Default.Share, contentDescription = "Compartilhar código")
+                        }
+                    }
+                }
+                Text(
+                    "Compartilhe o código com os irmãos para que eles entrem na congregação pelo app.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+private data class ThemeOption(val mode: ThemeMode, val label: String, val icon: ImageVector)
+
+private val ThemeOptions = listOf(
+    ThemeOption(ThemeMode.SYSTEM, "Sistema", Icons.Default.BrightnessAuto),
+    ThemeOption(ThemeMode.LIGHT, "Claro", Icons.Default.LightMode),
+    ThemeOption(ThemeMode.DARK, "Escuro", Icons.Default.DarkMode)
+)
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ThemeSelector(selected: ThemeMode, onSelect: (ThemeMode) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween), modifier = Modifier.fillMaxWidth()) {
+        ThemeOptions.forEachIndexed { index, option ->
+            ToggleButton(
+                checked = selected == option.mode,
+                onCheckedChange = { onSelect(option.mode) },
+                shapes = when (index) {
+                    0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                    ThemeOptions.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                    else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                },
+                modifier = Modifier.weight(1f).semantics { role = Role.RadioButton }
+            ) {
+                Icon(option.icon, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(option.label, maxLines = 1)
+            }
+        }
     }
 }
 
 @Composable
-private fun ColorOption(color: Color, selected: Boolean, onClick: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .size(48.dp)
-            .clip(CircleShape)
-            .background(color)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center
-    ) {
-        if (selected) {
-            Icon(
-                imageVector = Icons.Default.Check,
-                contentDescription = "Selecionado",
-                tint = Color.White,
-                modifier = Modifier.size(24.dp)
-            )
+private fun ColorSelector(selected: AppColor, onSelect: (AppColor) -> Unit) {
+    val supportsDynamic = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+        ColorOption(Brush.linearGradient(listOf(TerriGreen, TerriGreen)), "Verde", selected == AppColor.DEFAULT) { onSelect(AppColor.DEFAULT) }
+        ColorOption(Brush.linearGradient(listOf(TerriBlue, TerriBlue)), "Azul", selected == AppColor.BLUE) { onSelect(AppColor.BLUE) }
+        ColorOption(Brush.linearGradient(listOf(TerriPurple, TerriPurple)), "Roxo", selected == AppColor.PURPLE) { onSelect(AppColor.PURPLE) }
+        ColorOption(Brush.linearGradient(listOf(TerriOrange, TerriOrange)), "Laranja", selected == AppColor.ORANGE) { onSelect(AppColor.ORANGE) }
+        if (supportsDynamic) {
+            ColorOption(
+                Brush.sweepGradient(listOf(TerriGreen, TerriBlue, TerriPurple, TerriOrange, TerriGreen)),
+                "Sistema",
+                selected == AppColor.DYNAMIC,
+                icon = Icons.Default.AutoAwesome
+            ) { onSelect(AppColor.DYNAMIC) }
         }
     }
+}
+
+@Composable
+private fun ColorOption(brush: Brush, label: String, selected: Boolean, icon: ImageVector? = null, onClick: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(brush)
+                .then(if (selected) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape) else Modifier)
+                .clickable(onClick = onClick)
+                .semantics { role = Role.RadioButton },
+            contentAlignment = Alignment.Center
+        ) {
+            when {
+                selected -> Icon(Icons.Default.Check, contentDescription = "Selecionado", tint = Color.White)
+                icon != null -> Icon(icon, contentDescription = null, tint = Color.White)
+            }
+        }
+        Text(label, style = MaterialTheme.typography.labelSmall)
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun UpdateCard(version: String, message: String?, isChecking: Boolean, onCheck: () -> Unit) {
+    SettingsCard {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Column {
+                Text("TerriFlow", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("Versão $version", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        message?.let {
+            Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.fillMaxWidth()) {
+                Text(it, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(12.dp))
+            }
+        }
+        Button(onClick = onCheck, enabled = !isChecking, modifier = Modifier.fillMaxWidth()) {
+            if (isChecking) {
+                LoadingIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.onPrimary)
+                Spacer(Modifier.width(8.dp))
+                Text("Verificando…")
+            } else {
+                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Verificar atualizações")
+            }
+        }
+    }
+}
+
+@Composable
+private fun EditNameDialog(currentName: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
+    var name by remember { mutableStateOf(currentName) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Default.Edit, contentDescription = null) },
+        title = { Text("Editar meu nome") },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text("Nome completo") },
+                singleLine = true,
+                isError = name.isBlank(),
+                supportingText = { if (name.isBlank()) Text("O nome não pode ficar vazio") },
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            Button(onClick = { onSave(name.trim()) }, enabled = name.isNotBlank() && name.trim() != currentName) { Text("Salvar") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
+    )
 }
