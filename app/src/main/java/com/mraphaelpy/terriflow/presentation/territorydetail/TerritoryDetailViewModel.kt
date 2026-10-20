@@ -1,5 +1,6 @@
 package com.mraphaelpy.terriflow.presentation.territorydetail
 
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -21,6 +22,7 @@ import com.mraphaelpy.terriflow.domain.usecase.territory.DeleteTerritoryUseCase
 import com.mraphaelpy.terriflow.domain.usecase.territory.PauseTerritoryUseCase
 import com.mraphaelpy.terriflow.domain.usecase.territory.ReturnTerritoryUseCase
 import com.mraphaelpy.terriflow.domain.usecase.territory.StartTerritoryUseCase
+import com.mraphaelpy.terriflow.presentation.components.territoryPalette
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -40,6 +42,8 @@ data class TerritoryDetailUiState(
     val responsibles: List<User> = emptyList(),
     val currentUser: User? = null,
     val isLoading: Boolean = true,
+    val isPerformingAction: Boolean = false,
+    val territoryColor: Color? = null,
     val error: String? = null,
     val actionSuccess: String? = null,
     val isDeleted: Boolean = false,
@@ -82,8 +86,14 @@ class TerritoryDetailViewModel @Inject constructor(
 
     private fun loadData() {
         viewModelScope.launch {
-            val user = authRepository.getCurrentUser()
-            _uiState.update { it.copy(currentUser = user) }
+            authRepository.observeCurrentUser().collect { user ->
+                _uiState.update { it.copy(currentUser = user) }
+            }
+        }
+        viewModelScope.launch {
+            territoryRepository.observeAll().collect { all ->
+                _uiState.update { it.copy(territoryColor = territoryPalette(all)[territoryId]) }
+            }
         }
         viewModelScope.launch {
             territoryRepository.observeById(territoryId).collect { territory ->
@@ -192,12 +202,13 @@ class TerritoryDetailViewModel @Inject constructor(
     }
 
     private fun performAction(block: suspend () -> Unit) {
+        if (_uiState.value.isPerformingAction) return
         viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
+            _uiState.update { it.copy(isPerformingAction = true, error = null) }
             runCatching { block() }
-                .onSuccess { _uiState.update { it.copy(isLoading = false) } }
+                .onSuccess { _uiState.update { it.copy(isPerformingAction = false) } }
                 .onFailure { e ->
-                    _uiState.update { it.copy(isLoading = false, error = e.message) }
+                    _uiState.update { it.copy(isPerformingAction = false, error = e.message) }
                 }
         }
     }

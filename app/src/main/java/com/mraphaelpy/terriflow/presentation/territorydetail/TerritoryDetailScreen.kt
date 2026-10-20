@@ -1,47 +1,59 @@
 package com.mraphaelpy.terriflow.presentation.territorydetail
 
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.automirrored.filled.Undo
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeFlexibleTopAppBar
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -50,20 +62,28 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mraphaelpy.terriflow.core.util.DateFormats
 import com.mraphaelpy.terriflow.domain.model.Territory
 import com.mraphaelpy.terriflow.domain.model.TerritoryAction
 import com.mraphaelpy.terriflow.domain.model.TerritoryStatus
+import com.mraphaelpy.terriflow.domain.model.isMapped
 import com.mraphaelpy.terriflow.domain.model.label
 import com.mraphaelpy.terriflow.presentation.components.ConfirmDialog
 import com.mraphaelpy.terriflow.presentation.components.DestructiveDialog
 import com.mraphaelpy.terriflow.presentation.components.FullScreenLoading
-import com.mraphaelpy.terriflow.presentation.components.StatusChip
+import com.mraphaelpy.terriflow.presentation.components.UserAvatarByName
+import com.mraphaelpy.terriflow.presentation.components.statusColor
+import com.mraphaelpy.terriflow.presentation.map.markerLabel
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun TerritoryDetailScreen(
     onNavigateBack: () -> Unit,
@@ -73,11 +93,13 @@ fun TerritoryDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
 
     var showAssignDialog by remember { mutableStateOf(false) }
     var showCompleteDialog by remember { mutableStateOf(false) }
     var showReturnDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var showOverflow by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.isDeleted) {
         if (uiState.isDeleted) onNavigateBack()
@@ -146,209 +168,337 @@ fun TerritoryDetailScreen(
         )
     }
 
+    val territory = uiState.territory
+
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
-                title = { Text(uiState.territory?.code ?: "Território") },
+            LargeFlexibleTopAppBar(
+                title = { Text(territory?.name ?: "Território", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                subtitle = { territory?.let { Text(it.code) } },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
                     }
                 },
                 actions = {
-                    uiState.territory?.let { t ->
-                        if (t.hasLocation) {
-                            IconButton(onClick = { onNavigateToMap(t.id) }) {
-                                Icon(Icons.Default.Map, contentDescription = "Ver no mapa")
-                            }
+                    if (territory == null) return@LargeFlexibleTopAppBar
+                    if (territory.isMapped) {
+                        IconButton(onClick = { onNavigateToMap(territory.id) }) {
+                            Icon(Icons.Default.Map, contentDescription = "Ver no mapa")
                         }
-                        if (uiState.can(TerritoryAction.DELETE)) {
-                            IconButton(onClick = { showDeleteDialog = true }) {
-                                Icon(Icons.Default.Delete, contentDescription = "Apagar", tint = MaterialTheme.colorScheme.error)
-                            }
+                    }
+                    if (uiState.can(TerritoryAction.EDIT)) {
+                        IconButton(onClick = { onNavigateToEdit(territory.id) }) {
+                            Icon(Icons.Default.Edit, contentDescription = "Editar")
                         }
-                        if (uiState.can(TerritoryAction.EDIT)) {
-                            IconButton(onClick = { onNavigateToEdit(t.id) }) {
-                                Icon(Icons.Default.Edit, contentDescription = "Editar")
+                    }
+                    if (uiState.can(TerritoryAction.DELETE)) {
+                        Box {
+                            IconButton(onClick = { showOverflow = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = "Mais opções")
+                            }
+                            DropdownMenu(expanded = showOverflow, onDismissRequest = { showOverflow = false }) {
+                                DropdownMenuItem(
+                                    text = { Text("Apagar território", color = MaterialTheme.colorScheme.error) },
+                                    leadingIcon = {
+                                        Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                    },
+                                    onClick = {
+                                        showOverflow = false
+                                        showDeleteDialog = true
+                                    }
+                                )
                             }
                         }
                     }
-                }
+                },
+                scrollBehavior = scrollBehavior
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
-        if (uiState.isLoading && uiState.territory == null) {
-            FullScreenLoading(modifier = Modifier.padding(padding))
+        if (territory == null) {
+            if (uiState.isLoading) FullScreenLoading(modifier = Modifier.padding(padding))
             return@Scaffold
         }
 
-        val territory = uiState.territory ?: return@Scaffold
+        val color = uiState.territoryColor ?: statusColor(territory.status)
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                .padding(horizontal = 16.dp)
+                .padding(top = 8.dp, bottom = 24.dp)
+                .navigationBarsPadding(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            TerritoryInfoCard(territory, onViewMap = { onNavigateToMap(territory.id) })
+            HeroCard(territory = territory, color = color, isMine = territory.currentResponsibleId == uiState.currentUser?.id)
+
+            TerritoryActions(
+                uiState = uiState,
+                onAction = { action ->
+                    when (action) {
+                        TerritoryAction.ASSIGN -> showAssignDialog = true
+                        TerritoryAction.START -> viewModel.start()
+                        TerritoryAction.PAUSE -> viewModel.pause()
+                        TerritoryAction.COMPLETE -> showCompleteDialog = true
+                        TerritoryAction.RETURN -> showReturnDialog = true
+                        else -> Unit
+                    }
+                }
+            )
+
+            TerritoryInfoGroup(territory)
+
             TerritoryMiniMap(
                 lat = territory.latitude,
                 lng = territory.longitude,
                 label = "${territory.code} — ${territory.name}",
-                status = territory.status,
+                color = color,
                 boundaryPoints = territory.boundaryPoints,
                 blockPolygons = territory.blockPolygons,
                 onViewMap = { onNavigateToMap(territory.id) }
             )
-            ActionButtons(
-                uiState,
-                onAssign = { showAssignDialog = true },
-                onStart = { viewModel.start() },
-                onPause = { viewModel.pause() },
-                onComplete = { showCompleteDialog = true },
-                onReturn = { showReturnDialog = true }
-            )
+
             if (uiState.isAdmin) {
                 RotationHistoryCard(
                     pastWorkers = uiState.pastWorkers,
                     suggestedWorkers = uiState.suggestedWorkers
                 )
-                Text(
-                    "Histórico (Auditoria)",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                uiState.historyCycles.forEach { cycle ->
-                    HistoryCycleCard(cycle)
+                if (uiState.historyCycles.isNotEmpty()) {
+                    SectionTitle("Histórico")
+                    uiState.historyCycles.forEach { cycle -> HistoryCycleCard(cycle) }
                 }
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun TerritoryInfoCard(territory: Territory, onViewMap: () -> Unit = {}) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth()
-            .heightIn(180.dp)
-        ,
-        shape = RoundedCornerShape(5.dp),
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+private fun HeroCard(territory: Territory, color: Color, isMine: Boolean) {
+    val statusTint = statusColor(territory.status)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.surfaceContainer
     ) {
-        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(
-                text = territory.code,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.ExtraBold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
-            ) {
-                Text(
-                    text = territory.name,
-                    style = MaterialTheme.typography.headlineMedium,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f).padding(end = 12.dp)
-                )
-                StatusChip(territory.status)
-            }
-
-            if (territory.location.isNotEmpty()) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Icon(Icons.Default.LocationOn, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text(territory.location, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .background(color, MaterialShapes.Cookie9Sided.toShape()),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val label = markerLabel(territory.code)
+                    Text(
+                        label,
+                        style = if (label.length <= 2) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
                 }
-            }
-
-            if (territory.description.isNotEmpty()) {
-                Text(territory.description, style = MaterialTheme.typography.bodyMedium)
-            }
-
-            territory.currentResponsibleName?.let { name ->
-                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    com.mraphaelpy.terriflow.presentation.components.UserAvatarByName(name = name, photoUrl = territory.currentResponsiblePhotoUrl, size = 32.dp)
-                    Column {
-                        Text("Responsável atual", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                        Text(name, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Surface(shape = CircleShape, color = statusTint.copy(alpha = 0.18f)) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(Modifier.size(8.dp).background(statusTint, CircleShape))
+                            Text(territory.status.label(), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                    val since = statusSince(territory)
+                    if (since.isNotEmpty()) {
+                        Text(since, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
 
-            if (territory.notes.isNotEmpty()) {
-                HorizontalDivider()
-                Text(territory.notes, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.large,
+                color = if (isMine) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    val name = territory.currentResponsibleName
+                    if (name != null) {
+                        UserAvatarByName(name = name, photoUrl = territory.currentResponsiblePhotoUrl, size = 40.dp)
+                    } else {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(Icons.Default.PersonAdd, contentDescription = null, tint = MaterialTheme.colorScheme.outline)
+                        }
+                    }
+                    Column {
+                        Text("Dirigente", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            when {
+                                name == null -> "Sem dirigente"
+                                isMine -> "$name (você)"
+                                else -> name
+                            },
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun TerritoryActions(uiState: TerritoryDetailUiState, onAction: (TerritoryAction) -> Unit) {
+    val layout = actionLayout(uiState.allowedActions)
+    if (layout.primary == null && layout.secondary.isEmpty()) return
+    val enabled = !uiState.isPerformingAction
+    val isPaused = uiState.territory?.status == TerritoryStatus.PAUSED
+
+    Column(
+        modifier = Modifier.animateContentSize(MaterialTheme.motionScheme.defaultSpatialSpec()),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        layout.primary?.let { action ->
+            val height = ButtonDefaults.MediumContainerHeight
+            Button(
+                onClick = { onAction(action) },
+                shapes = ButtonDefaults.shapesFor(height),
+                enabled = enabled,
+                contentPadding = ButtonDefaults.contentPaddingFor(height),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = height)
+            ) {
+                Icon(actionIcon(action), contentDescription = null, modifier = Modifier.size(ButtonDefaults.iconSizeFor(height)))
+                Spacer(Modifier.size(ButtonDefaults.iconSpacingFor(height)))
+                Text(actionLabel(action, isPaused), style = ButtonDefaults.textStyleFor(height))
+            }
+        }
+        if (layout.secondary.isNotEmpty()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                layout.secondary.forEach { action ->
+                    SecondaryActionButton(action, isPaused, enabled) { onAction(action) }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun RowScope.SecondaryActionButton(
+    action: TerritoryAction,
+    isPaused: Boolean,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    val modifier = Modifier
+        .weight(1f)
+        .heightIn(min = ButtonDefaults.MinHeight)
+    val content: @Composable RowScope.() -> Unit = {
+        Icon(actionIcon(action), contentDescription = null, modifier = Modifier.size(ButtonDefaults.IconSize))
+        Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+        Text(actionLabel(action, isPaused), maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+    if (action == TerritoryAction.RETURN) {
+        OutlinedButton(
+            onClick = onClick,
+            shapes = ButtonDefaults.shapes(),
+            enabled = enabled,
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            modifier = modifier,
+            content = content
+        )
+    } else {
+        FilledTonalButton(
+            onClick = onClick,
+            shapes = ButtonDefaults.shapes(),
+            enabled = enabled,
+            modifier = modifier,
+            content = content
+        )
+    }
+}
+
+private fun actionIcon(action: TerritoryAction): ImageVector = when (action) {
+    TerritoryAction.ASSIGN -> Icons.Default.PersonAdd
+    TerritoryAction.START -> Icons.Default.PlayArrow
+    TerritoryAction.PAUSE -> Icons.Default.Pause
+    TerritoryAction.COMPLETE -> Icons.Default.TaskAlt
+    TerritoryAction.RETURN -> Icons.AutoMirrored.Filled.Undo
+    else -> Icons.Default.Edit
+}
+
+private fun actionLabel(action: TerritoryAction, isPaused: Boolean): String = when (action) {
+    TerritoryAction.ASSIGN -> "Atribuir"
+    TerritoryAction.START -> if (isPaused) "Retomar trabalho" else "Iniciar trabalho"
+    TerritoryAction.PAUSE -> "Pausar"
+    TerritoryAction.COMPLETE -> "Finalizar"
+    TerritoryAction.RETURN -> "Devolver"
+    else -> action.label()
+}
+
+private data class InfoEntry(val icon: ImageVector, val label: String, val value: String)
+
+@Composable
+private fun TerritoryInfoGroup(territory: Territory) {
+    val formatter = DateFormats.fullDate()
+    val entries = buildList {
+        if (territory.location.isNotBlank()) add(InfoEntry(Icons.Default.LocationOn, "Localização", territory.location))
+        if (territory.description.isNotBlank()) add(InfoEntry(Icons.Default.Description, "Descrição", territory.description))
+        if (territory.notes.isNotBlank()) add(InfoEntry(Icons.AutoMirrored.Filled.Notes, "Observações", territory.notes))
+        territory.assignedAt?.let { add(InfoEntry(Icons.Default.CalendarMonth, "Atribuído em", formatter.format(it))) }
+        territory.startedAt?.let { add(InfoEntry(Icons.Default.PlayArrow, "Iniciado em", formatter.format(it))) }
+        territory.completedAt?.let { add(InfoEntry(Icons.Default.TaskAlt, "Finalizado em", formatter.format(it))) }
+    }
+    if (entries.isEmpty()) return
+
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        entries.forEachIndexed { index, entry ->
+            val top = if (index == 0) 24.dp else 6.dp
+            val bottom = if (index == entries.lastIndex) 24.dp else 6.dp
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom),
+                color = MaterialTheme.colorScheme.surfaceContainer
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(entry.icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Column {
+                        Text(entry.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(entry.value, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun ActionButtons(
-    uiState: TerritoryDetailUiState,
-    onAssign: () -> Unit,
-    onStart: () -> Unit,
-    onPause: () -> Unit,
-    onComplete: () -> Unit,
-    onReturn: () -> Unit
-) {
-    Column(
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.animateContentSize(
-            animationSpec = spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessMediumLow
-            )
-        )
-    ) {
-        if (uiState.can(TerritoryAction.ASSIGN)) {
-            OutlinedButton(onClick = onAssign, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.PersonAdd, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Atribuir território")
-            }
-        }
-        if (uiState.can(TerritoryAction.START)) {
-            Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(if (uiState.territory?.status == TerritoryStatus.PAUSED) "Retomar trabalho" else "Iniciar trabalho")
-            }
-        }
-        if (uiState.can(TerritoryAction.PAUSE)) {
-            OutlinedButton(onClick = onPause, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Default.Pause, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Pausar trabalho")
-            }
-        }
-        if (uiState.can(TerritoryAction.COMPLETE)) {
-            Button(
-                onClick = onComplete,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)
-            ) {
-                Icon(Icons.Default.TaskAlt, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Finalizar território")
-            }
-        }
-        if (uiState.can(TerritoryAction.RETURN)) {
-            OutlinedButton(
-                onClick = onReturn,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
-            ) {
-                Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text("Devolver território")
-            }
-        }
-    }
+internal fun SectionTitle(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(start = 4.dp, top = 8.dp)
+    )
 }

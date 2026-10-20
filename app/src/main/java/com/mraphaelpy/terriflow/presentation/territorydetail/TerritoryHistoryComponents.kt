@@ -7,21 +7,23 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Lightbulb
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.toShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,13 +39,13 @@ internal fun RotationHistoryCard(
     pastWorkers: List<com.mraphaelpy.terriflow.domain.model.ResponsibleRotationInfo>,
     suggestedWorkers: List<com.mraphaelpy.terriflow.domain.model.ResponsibleRotationInfo>
 ) {
-    ElevatedCard(
+    Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.surfaceContainer
     ) {
         Column(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Row(
@@ -71,7 +73,11 @@ internal fun RotationHistoryCard(
                     onClick = {},
                     label = {
                         Text(
-                            text = if (pastWorkers.isEmpty()) "Sem histórico" else "${pastWorkers.size} dirigentes",
+                            text = when (pastWorkers.size) {
+                                0 -> "Sem histórico"
+                                1 -> "1 dirigente"
+                                else -> "${pastWorkers.size} dirigentes"
+                            },
                             style = MaterialTheme.typography.labelSmall
                         )
                     }
@@ -96,10 +102,10 @@ internal fun RotationHistoryCard(
                         modifier = Modifier
                             .fillMaxWidth()
                             .background(
-                                MaterialTheme.colorScheme.surfaceContainer,
-                                shape = MaterialTheme.shapes.medium
+                                MaterialTheme.colorScheme.surfaceContainerHigh,
+                                shape = MaterialTheme.shapes.large
                             )
-                            .padding(8.dp),
+                            .padding(10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         com.mraphaelpy.terriflow.presentation.components.UserAvatar(user = worker.user, size = 36.dp)
@@ -127,11 +133,23 @@ internal fun RotationHistoryCard(
                 }
 
                 if (suggestedWorkers.isNotEmpty()) {
-                    Text(
-                        text = "💡 ${suggestedWorkers.size} dirigentes da congregação ainda não foram designados para cá.",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(
+                            Icons.Default.Lightbulb,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = if (suggestedWorkers.size == 1) {
+                                "1 dirigente da congregação ainda não foi designado para cá."
+                            } else {
+                                "${suggestedWorkers.size} dirigentes da congregação ainda não foram designados para cá."
+                            },
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
         }
@@ -140,12 +158,12 @@ internal fun RotationHistoryCard(
 
 @Composable
 internal fun HistoryCycleCard(cycle: HistoryCycle) {
-    ElevatedCard(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-        shape = MaterialTheme.shapes.large,
-        colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.surfaceContainer
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 16.dp)) {
                 com.mraphaelpy.terriflow.presentation.components.UserAvatarByName(name = cycle.responsibleName, size = 40.dp)
                 Spacer(Modifier.width(12.dp))
@@ -167,13 +185,14 @@ internal fun HistoryCycleCard(cycle: HistoryCycle) {
             cycle.events.forEachIndexed { index, event ->
                 TimelineEventItem(event)
                 if (index < cycle.events.size - 1) {
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                    Spacer(Modifier.height(12.dp))
                 }
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun TimelineEventItem(event: TerritoryEvent) {
     val formatter = DateFormats.fullDateTime()
@@ -183,7 +202,7 @@ private fun TimelineEventItem(event: TerritoryEvent) {
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Surface(
-                shape = CircleShape,
+                shape = MaterialShapes.Cookie6Sided.toShape(),
                 color = MaterialTheme.colorScheme.primaryContainer,
                 modifier = Modifier.size(40.dp)
             ) {
