@@ -1,8 +1,8 @@
 package com.mraphaelpy.terriflow.presentation.components
 
+import com.mraphaelpy.terriflow.core.util.normalizedForSearch
 import com.mraphaelpy.terriflow.domain.model.Territory
 import com.mraphaelpy.terriflow.domain.model.TerritoryStatus
-import java.text.Normalizer
 
 data class TerritoryFilter(
     val status: TerritoryStatus? = null,
@@ -12,7 +12,7 @@ data class TerritoryFilter(
     val isActive: Boolean get() = status != null || onlyMine || query.isNotBlank()
 
     fun apply(territories: List<Territory>, currentUserId: String?): List<Territory> {
-        val normalizedQuery = query.normalizeForSearch()
+        val normalizedQuery = query.normalizedForSearch()
         return territories.filter { territory ->
             (status == null || territory.status == status) &&
                 (!onlyMine || (currentUserId != null && territory.currentResponsibleId == currentUserId)) &&
@@ -22,8 +22,6 @@ data class TerritoryFilter(
 
     private fun Territory.matches(normalizedQuery: String): Boolean =
         listOfNotNull(code, name, location, currentResponsibleName)
-            .any { it.normalizeForSearch().contains(normalizedQuery) }
+            .any { it.normalizedForSearch().contains(normalizedQuery) }
 
-    private fun String.normalizeForSearch(): String =
-        Normalizer.normalize(trim(), Normalizer.Form.NFD).replace(Regex("\\p{M}"), "").lowercase()
 }

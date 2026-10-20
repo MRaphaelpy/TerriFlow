@@ -2,181 +2,156 @@ package com.mraphaelpy.terriflow.presentation.users
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mraphaelpy.terriflow.core.util.normalizedForSearch
+import com.mraphaelpy.terriflow.domain.model.TerritoryStatistics
 import com.mraphaelpy.terriflow.domain.model.User
 import com.mraphaelpy.terriflow.domain.model.UserRole
 import com.mraphaelpy.terriflow.domain.model.label
+import com.mraphaelpy.terriflow.domain.policy.UserManagementPolicy
 import com.mraphaelpy.terriflow.domain.repository.AuthRepository
+import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
 import com.mraphaelpy.terriflow.domain.repository.UserRepository
 import com.mraphaelpy.terriflow.domain.usecase.user.RenameUserUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+enum class UserFilter(val label: String) {
+    ALL("Todos"),
+    ADMINS("Administradores"),
+    RESPONSIBLES("Dirigentes"),
+    INACTIVE("Inativos");
+
+    fun matches(user: User): Boolean = when (this) {
+        ALL -> true
+        ADMINS -> user.active && user.isAdmin
+        RESPONSIBLES -> user.active && !user.isAdmin
+        INACTIVE -> !user.active
+    }
+}
+
+data class UserSection(val title: String, val users: List<User>)
+
 data class UsersUiState(
     val currentUser: User? = null,
-    val users: List<User> = emptyList(),
-    val filteredUsers: List<User> = emptyList(),
-    val searchQuery: String = "",
-    val filterRole: UserRole? = null,
-    val isLoading: Boolean = true,
-    val error: String? = null,
-    val successMessage: String? = null
+    val sections: List<UserSection> = emptyList(),
+    val counts: Map<UserFilter, Int> = emptyMap(),
+    val currentTerritories: Map<String, Int> = emptyMap(),
+    val query: String = "",
+    val filter: UserFilter = UserFilter.ALL,
+    val isLoading: Boolean = true
 ) {
-    val isAdmin: Boolean get() = currentUser?.isAdmin == true
+    val total: Int get() = counts[UserFilter.ALL] ?: 0
+    val visibleCount: Int get() = sections.sumOf { it.users.size }
 
-    val isSuperAdmin: Boolean get() = currentUser?.isSuperAdmin == true
+    fun canRename(target: User) = UserManagementPolicy.canRename(currentUser, target)
+    fun roleChanges(target: User) = UserManagementPolicy.roleChanges(currentUser, target)
+    fun canToggleActive(target: User) = UserManagementPolicy.canToggleActive(currentUser, target)
 }
 
 @HiltViewModel
 class UsersViewModel @Inject constructor(
     private val userRepository: UserRepository,
-    private val authRepository: AuthRepository,
+    authRepository: AuthRepository,
+    territoryRepository: TerritoryRepository,
     private val renameUser: RenameUserUseCase
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(UsersUiState())
-    val uiState: StateFlow<UsersUiState> = _uiState.asStateFlow()
+    private val query = MutableStateFlow("")
+    private val filter = MutableStateFlow(UserFilter.ALL)
 
-    private val _searchQuery = MutableStateFlow("")
-    private val _filterRole = MutableStateFlow<UserRole?>(null)
+    private val _message = MutableStateFlow<String?>(null)
+    val message: StateFlow<String?> = _message
+
+    val uiState: StateFlow<UsersUiState> = combine(
+        authRepository.observeCurrentUser(),
+        userRepository.observeAll(),
+        territoryRepository.observeAll(),
+        query,
+        filter
+    ) { currentUser, users, territories, currentQuery, currentFilter ->
+        val normalized = currentQuery.normalizedForSearch()
+        val visible = users.filter { user ->
+            currentFilter.matches(user) && (normalized.isEmpty() ||
+                user.name.normalizedForSearch().contains(normalized) ||
+                user.email.normalizedForSearch().contains(normalized))
+        }
+        UsersUiState(
+            currentUser = currentUser,
+            sections = listOf(
+                UserSection("Administradores", visible.filter { it.active && it.isAdmin }),
+                UserSection("Dirigentes", visible.filter { it.active && !it.isAdmin }),
+                UserSection("Inativos", visible.filter { !it.active })
+            ).filter { it.users.isNotEmpty() },
+            counts = UserFilter.entries.associateWith { f -> users.count(f::matches) },
+            currentTerritories = territories
+                .filter { it.status in TerritoryStatistics.ACTIVE_STATUSES }
+                .mapNotNull { it.currentResponsibleId }
+                .groupingBy { it }
+                .eachCount(),
+            query = currentQuery,
+            filter = currentFilter,
+            isLoading = false
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UsersUiState())
 
     init {
-        viewModelScope.launch {
-            runCatching { userRepository.syncFromRemote() }
-        }
-
-        viewModelScope.launch {
-            combine(
-                authRepository.observeCurrentUser(),
-                userRepository.observeAll(),
-                _searchQuery,
-                _filterRole
-            ) { currentUser, users, query, roleFilter ->
-                val filtered = users.filter { user ->
-                    val matchesQuery = query.isBlank() ||
-                        user.name.contains(query, ignoreCase = true) ||
-                        user.email.contains(query, ignoreCase = true)
-                    val matchesRole = roleFilter == null || user.role == roleFilter
-                    matchesQuery && matchesRole
-                }
-                UsersUiState(
-                    currentUser = currentUser,
-                    users = users,
-                    filteredUsers = filtered,
-                    searchQuery = query,
-                    filterRole = roleFilter,
-                    isLoading = false
-                )
-            }.collect { state ->
-                _uiState.update { current ->
-                    state.copy(
-                        error = current.error,
-                        successMessage = current.successMessage
-                    )
-                }
-            }
-        }
+        viewModelScope.launch { runCatching { userRepository.syncFromRemote() } }
     }
 
-    fun onSearchQueryChanged(query: String) {
-        _searchQuery.value = query
+    fun onQueryChange(value: String) {
+        query.value = value
     }
 
-    fun onFilterRoleSelected(role: UserRole?) {
-        _filterRole.value = role
+    fun onFilterSelected(value: UserFilter) {
+        filter.value = value
+    }
+
+    fun clearMessage() {
+        _message.value = null
     }
 
     fun updateUserRole(user: User, newRole: UserRole) {
-        val current = _uiState.value.currentUser
-        if (current?.isAdmin != true) {
-            _uiState.update { it.copy(error = "Você não tem permissão para alterar funções") }
+        if (newRole !in uiState.value.roleChanges(user)) {
+            _message.value = "Você não tem permissão para alterar esta função"
             return
         }
-
-        if (user.isSuperAdmin && !current.isSuperAdmin) {
-            _uiState.update { it.copy(error = "Apenas o Super Admin pode alterar a função do criador") }
-            return
-        }
-
-        viewModelScope.launch {
-            val updatedUser = user.copy(role = newRole)
-            runCatching {
-                userRepository.save(updatedUser)
-            }.onSuccess {
-                _uiState.update { it.copy(successMessage = "${user.name} agora é ${newRole.label()}") }
-            }.onFailure { e ->
-                _uiState.update { it.copy(error = "Erro ao alterar função: ${e.message ?: "Tente novamente"}") }
-            }
+        run("${user.name} agora é ${newRole.label()}", "Erro ao alterar função") {
+            userRepository.save(user.copy(role = newRole))
         }
     }
 
     fun updateUserName(user: User, newName: String) {
         val trimmed = newName.trim()
-        if (trimmed.isBlank()) {
-            _uiState.update { it.copy(error = "O nome não pode ficar em branco") }
-            return
-        }
-
-        val current = _uiState.value.currentUser
-        val isSelf = current?.id == user.id
-        val isAdmin = current?.isAdmin == true
-
-        if (!isSelf && !isAdmin) {
-            _uiState.update { it.copy(error = "Você não tem permissão para alterar o nome de outro usuário") }
-            return
-        }
-
-        viewModelScope.launch {
-            runCatching {
-                renameUser(user.id, trimmed)
-            }.onSuccess {
-                _uiState.update { it.copy(successMessage = "Nome atualizado para \"$trimmed\" com sucesso") }
-            }.onFailure { e ->
-                _uiState.update { it.copy(error = "Erro ao atualizar nome: ${e.message ?: "Tente novamente"}") }
-            }
+        when {
+            trimmed.isBlank() -> _message.value = "O nome não pode ficar em branco"
+            !uiState.value.canRename(user) -> _message.value = "Você não tem permissão para alterar este nome"
+            else -> run("Nome atualizado para \"$trimmed\"", "Erro ao atualizar nome") { renameUser(user.id, trimmed) }
         }
     }
 
     fun toggleUserStatus(user: User) {
-        val current = _uiState.value.currentUser
-        if (current?.isAdmin != true) {
-            _uiState.update { it.copy(error = "Você não tem permissão para alterar o status do usuário") }
+        if (!uiState.value.canToggleActive(user)) {
+            _message.value = "Você não tem permissão para alterar o status deste usuário"
             return
         }
-
-        if (user.isSuperAdmin) {
-            _uiState.update { it.copy(error = "Não é possível desativar o Super Admin") }
-            return
+        val updated = user.copy(active = !user.active)
+        run("${user.name} foi ${if (updated.active) "reativado" else "desativado"}", "Erro ao alterar status") {
+            userRepository.save(updated)
         }
+    }
 
-        if (user.id == current.id) {
-            _uiState.update { it.copy(error = "Você não pode desativar sua própria conta") }
-            return
-        }
-
-        val updatedUser = user.copy(active = !user.active)
+    private fun run(success: String, failure: String, block: suspend () -> Unit) {
         viewModelScope.launch {
-            runCatching {
-                userRepository.save(updatedUser)
-            }.onSuccess {
-                val statusText = if (updatedUser.active) "reativado" else "desativado"
-                _uiState.update { it.copy(successMessage = "${user.name} foi $statusText") }
-            }.onFailure { e ->
-                _uiState.update { it.copy(error = "Erro ao alterar status: ${e.message ?: "Tente novamente"}") }
-            }
+            _message.value = runCatching { block() }.fold(
+                onSuccess = { success },
+                onFailure = { "$failure: ${it.message ?: "tente novamente"}" }
+            )
         }
-    }
-
-    fun clearError() {
-        _uiState.update { it.copy(error = null) }
-    }
-
-    fun clearSuccessMessage() {
-        _uiState.update { it.copy(successMessage = null) }
     }
 }
