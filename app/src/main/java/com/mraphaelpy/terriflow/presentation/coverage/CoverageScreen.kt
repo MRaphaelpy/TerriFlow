@@ -1,5 +1,6 @@
 package com.mraphaelpy.terriflow.presentation.coverage
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,50 +10,68 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeFlexibleTopAppBar
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mraphaelpy.terriflow.core.report.ReportFormat
 import com.mraphaelpy.terriflow.core.util.DateFormats
-import com.mraphaelpy.terriflow.domain.model.label
+import com.mraphaelpy.terriflow.domain.model.ResponsibleStats
+import com.mraphaelpy.terriflow.domain.model.ServiceYearCoverage
 import com.mraphaelpy.terriflow.presentation.components.FullScreenLoading
+import com.mraphaelpy.terriflow.presentation.components.OptionSheet
+import com.mraphaelpy.terriflow.presentation.components.SheetOption
+import com.mraphaelpy.terriflow.presentation.components.TerritoryShapeBadge
+import com.mraphaelpy.terriflow.presentation.components.UserAvatarByName
 import java.util.Date
 import java.util.concurrent.TimeUnit
+import kotlin.math.roundToInt
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun CoverageScreen(
     onNavigateBack: () -> Unit,
@@ -60,12 +79,36 @@ fun CoverageScreen(
     viewModel: CoverageViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    var showSortMenu by remember { mutableStateOf(false) }
+    val isSyncing by viewModel.isSyncing.collectAsStateWithLifecycle()
+    val shareIntent by viewModel.shareIntent.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    var showExportMenu by remember { mutableStateOf(false) }
+    var showSortSheet by remember { mutableStateOf(false) }
+
+    LaunchedEffect(shareIntent) {
+        shareIntent?.let {
+            context.startActivity(it)
+            viewModel.onShareHandled()
+        }
+    }
+
+    if (showSortSheet) {
+        OptionSheet(
+            title = "Mostrar",
+            options = CoverageSortOption.entries.map { SheetOption(it, it.label) },
+            selected = uiState.sortOption,
+            onSelect = viewModel::setSortOption,
+            onDismiss = { showSortSheet = false }
+        )
+    }
 
     Scaffold(
+        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
-                title = { Text("Painel de Cobertura") },
+            LargeFlexibleTopAppBar(
+                title = { Text("Cobertura") },
+                subtitle = { Text("Ano de serviço ${uiState.year.label}") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
@@ -73,250 +116,228 @@ fun CoverageScreen(
                 },
                 actions = {
                     Box {
-                        IconButton(onClick = { showSortMenu = true }) {
-                            Icon(Icons.Default.Sort, contentDescription = "Ordenar")
+                        IconButton(onClick = { showExportMenu = true }) {
+                            Icon(Icons.Default.FileDownload, contentDescription = "Exportar S-13")
                         }
-                        DropdownMenu(
-                            expanded = showSortMenu,
-                            onDismissRequest = { showSortMenu = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Mais tempo sem trabalhar") },
-                                onClick = { 
-                                    viewModel.setSortOption(CoverageSortOption.OLDEST_COMPLETED_FIRST)
-                                    showSortMenu = false
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Trabalhados recentemente") },
-                                onClick = { 
-                                    viewModel.setSortOption(CoverageSortOption.NEWEST_COMPLETED_FIRST)
-                                    showSortMenu = false
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Nunca trabalhados") },
-                                onClick = { 
-                                    viewModel.setSortOption(CoverageSortOption.NEVER_WORKED)
-                                    showSortMenu = false
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Mais trabalhados") },
-                                onClick = { 
-                                    viewModel.setSortOption(CoverageSortOption.MOST_WORKED)
-                                    showSortMenu = false
-                                }
-                            )
+                        DropdownMenu(expanded = showExportMenu, onDismissRequest = { showExportMenu = false }) {
+                            DropdownMenuItem(text = { Text("S-13 em PDF") }, onClick = {
+                                showExportMenu = false
+                                viewModel.exportS13(ReportFormat.PDF)
+                            })
+                            DropdownMenuItem(text = { Text("S-13 em planilha (CSV)") }, onClick = {
+                                showExportMenu = false
+                                viewModel.exportS13(ReportFormat.CSV)
+                            })
                         }
                     }
-                }
+                },
+                scrollBehavior = scrollBehavior
             )
         }
     ) { padding ->
         if (uiState.isLoading) {
-            FullScreenLoading(modifier = Modifier.padding(padding))
+            FullScreenLoading(Modifier.padding(padding))
             return@Scaffold
         }
-
-        if (uiState.coverages.isEmpty()) {
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Text("Nenhum território corresponde a este filtro.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            return@Scaffold
-        }
-
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            item {
-                Text(
-                    text = when(uiState.sortOption) {
-                        CoverageSortOption.OLDEST_COMPLETED_FIRST -> "Listando do mais antigo para o mais recente"
-                        CoverageSortOption.NEWEST_COMPLETED_FIRST -> "Listando do mais recente para o mais antigo"
-                        CoverageSortOption.NEVER_WORKED -> "Territórios nunca concluídos"
-                        CoverageSortOption.MOST_WORKED -> "Territórios mais vezes concluídos"
-                    },
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
+            if (isSyncing) {
+                item(key = "sync") { LinearWavyProgressIndicator(Modifier.fillMaxWidth().padding(bottom = 8.dp)) }
             }
-            
-            items(uiState.coverages, key = { it.territory.id }) { coverage ->
-                CoverageCard(
-                    coverage = coverage,
-                    onClick = { onNavigateToTerritory(coverage.territory.id) }
-                )
+            item(key = "years") {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(bottom = 12.dp)) {
+                    items(viewModel.availableYears) { year ->
+                        FilterChip(
+                            selected = year == uiState.year,
+                            onClick = { viewModel.setYear(year) },
+                            label = { Text(year.label) },
+                            shape = CircleShape
+                        )
+                    }
+                }
+            }
+            uiState.coverage?.let { coverage ->
+                item(key = "goal") {
+                    GoalCard(coverage, uiState.staleCount) { viewModel.setSortOption(CoverageSortOption.OVER_12_MONTHS) }
+                }
+            }
+            item(key = "tabs") {
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp)) {
+                    CoverageTab.entries.forEachIndexed { index, tab ->
+                        SegmentedButton(
+                            selected = uiState.tab == tab,
+                            onClick = { viewModel.setTab(tab) },
+                            shape = SegmentedButtonDefaults.itemShape(index, CoverageTab.entries.size)
+                        ) {
+                            Text(if (tab == CoverageTab.TERRITORIES) "Territórios" else "Dirigentes")
+                        }
+                    }
+                }
+            }
+            when (uiState.tab) {
+                CoverageTab.TERRITORIES -> {
+                    item(key = "sort") {
+                        FilterChip(
+                            selected = true,
+                            onClick = { showSortSheet = true },
+                            label = { Text("${uiState.sortOption.label} (${uiState.coverages.size})") },
+                            trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = null) },
+                            shape = CircleShape,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                    }
+                    itemsIndexed(uiState.coverages, key = { _, it -> it.territory.id }) { index, coverage ->
+                        CoverageRow(
+                            coverage = coverage,
+                            color = uiState.palette[coverage.territory.id] ?: MaterialTheme.colorScheme.primary,
+                            shape = segmentShape(index, uiState.coverages.size),
+                            onClick = { onNavigateToTerritory(coverage.territory.id) }
+                        )
+                    }
+                }
+                CoverageTab.RESPONSIBLES -> {
+                    itemsIndexed(uiState.responsibles, key = { _, it -> it.responsibleId ?: it.name }) { index, stats ->
+                        ResponsibleRow(stats, segmentShape(index, uiState.responsibles.size))
+                    }
+                    if (uiState.responsibles.isEmpty()) {
+                        item { Text("Nenhuma designação registrada.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun GoalCard(coverage: ServiceYearCoverage, staleCount: Int, onStaleClick: () -> Unit) {
+    Surface(modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.extraLarge, color = MaterialTheme.colorScheme.primaryContainer) {
+        Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                Box(contentAlignment = Alignment.Center) {
+                    CircularWavyProgressIndicator(
+                        progress = { coverage.percent / 100f },
+                        modifier = Modifier.size(96.dp)
+                    )
+                    Text("${coverage.percent}%", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "${coverage.worked.size} de ${coverage.total}",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        "territórios concluídos no ano de serviço",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        "${coverage.pending.size} pendentes",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+            if (staleCount > 0) {
+                Surface(
+                    onClick = onStaleClick,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large,
+                    color = MaterialTheme.colorScheme.errorContainer
+                ) {
+                    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Icon(Icons.Default.Warning, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
+                        Text(
+                            "$staleCount sem conclusão há mais de 12 meses",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onErrorContainer
+                        )
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun CoverageCard(
-    coverage: TerritoryCoverage,
-    onClick: () -> Unit
-) {
-    val formatter = DateFormats.fullDate()
-    val now = Date().time
-    val daysSinceCompleted = coverage.lastCompletedDate?.time?.let {
-        TimeUnit.MILLISECONDS.toDays(now - it)
-    }
-
-    val isOverdue = daysSinceCompleted != null && daysSinceCompleted > 180
-    val isNeverWorked = coverage.lastCompletedDate == null
-
-    val containerColor = when {
-        isOverdue -> MaterialTheme.colorScheme.errorContainer
-        isNeverWorked -> MaterialTheme.colorScheme.tertiaryContainer
-        else -> MaterialTheme.colorScheme.surfaceContainerLow
-    }
-    val onContainerColor = when {
-        isOverdue -> MaterialTheme.colorScheme.onErrorContainer
-        isNeverWorked -> MaterialTheme.colorScheme.onTertiaryContainer
-        else -> MaterialTheme.colorScheme.onSurface
-    }
-    val accentColor = when {
-        isOverdue -> MaterialTheme.colorScheme.error
-        isNeverWorked -> MaterialTheme.colorScheme.tertiary
-        else -> MaterialTheme.colorScheme.primary
-    }
-
-    Card(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth()
-            .heightIn(140.dp)
-        ,
-        shape = RoundedCornerShape(5.dp),
-        colors = CardDefaults.cardColors(containerColor = containerColor)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(
-                        text = coverage.territory.code,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Black,
-                        color = accentColor
-                    )
-                    Text(
-                        text = coverage.territory.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = onContainerColor
-                    )
-                }
-                Surface(
-                    shape = MaterialTheme.shapes.small,
-                    color = accentColor.copy(alpha = 0.15f)
-                ) {
-                    Text(
-                        text = "${coverage.completionCount}x Feito",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = accentColor,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
-                }
+private fun CoverageRow(coverage: TerritoryCoverage, color: Color, shape: RoundedCornerShape, onClick: () -> Unit) {
+    val last = coverage.lastCompletedDate
+    Surface(onClick = onClick, modifier = Modifier.fillMaxWidth(), shape = shape, color = MaterialTheme.colorScheme.surfaceContainer) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            TerritoryShapeBadge(coverage.territory.code, color, size = 44.dp)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(coverage.territory.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    if (last == null) "Nunca concluído" else "Última conclusão: ${DateFormats.fullDate().format(last)} (${monthsAgo(last)})",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (last == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                val details = listOfNotNull(
+                    "${coverage.completionCount}× concluído",
+                    coverage.averageDaysToComplete?.let { "média de ${it.roundToInt()} dias" }
+                )
+                Text(details.joinToString(" · "), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            if (coverage.completedInYear) {
+                Icon(Icons.Default.CheckCircle, contentDescription = "Concluído no ano", tint = Color(0xFF4CAF50))
+            }
+        }
+    }
+}
 
-            Spacer(Modifier.height(12.dp))
-            HorizontalDivider(color = onContainerColor.copy(alpha = 0.12f))
-            Spacer(Modifier.height(12.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        imageVector = if (isOverdue || isNeverWorked) Icons.Default.Warning else Icons.Default.CheckCircle,
-                        contentDescription = null,
-                        tint = accentColor,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Column {
-                        Text(
-                            "Última conclusão",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = onContainerColor.copy(alpha = 0.6f)
-                        )
-                        Text(
-                            text = if (coverage.lastCompletedDate != null) formatter.format(coverage.lastCompletedDate) else "Nunca",
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = onContainerColor
-                        )
-                    }
-                }
-                if (daysSinceCompleted != null) {
+@Composable
+private fun ResponsibleRow(stats: ResponsibleStats, shape: RoundedCornerShape) {
+    Surface(modifier = Modifier.fillMaxWidth(), shape = shape, color = MaterialTheme.colorScheme.surfaceContainer) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            UserAvatarByName(name = stats.name, size = 40.dp)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(stats.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                Text(
+                    listOfNotNull(
+                        "${stats.completed} de ${stats.assignments} concluídos",
+                        stats.averageDaysToComplete?.let { "média de ${it.roundToInt()} dias" }
+                    ).joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (stats.currentTerritories > 0) {
+                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer) {
                     Text(
-                        text = "Há $daysSinceCompleted dias",
+                        "${stats.currentTerritories} atual${if (stats.currentTerritories > 1) "is" else ""}",
                         style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Medium,
-                        color = if (isOverdue) MaterialTheme.colorScheme.error else onContainerColor.copy(alpha = 0.7f)
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                     )
-                }
-            }
-
-            if (coverage.historyPreview.isNotEmpty()) {
-                Spacer(Modifier.height(12.dp))
-                HorizontalDivider(color = onContainerColor.copy(alpha = 0.12f))
-                Spacer(Modifier.height(8.dp))
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(
-                        Icons.Default.History,
-                        contentDescription = null,
-                        modifier = Modifier.size(14.dp),
-                        tint = onContainerColor.copy(alpha = 0.6f)
-                    )
-                    Text(
-                        "Últimas atividades",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = onContainerColor.copy(alpha = 0.6f)
-                    )
-                }
-                Spacer(Modifier.height(6.dp))
-                coverage.historyPreview.forEach { event ->
-                    val eventDate = DateFormats.shortDate().format(event.timestamp)
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Surface(
-                            shape = androidx.compose.foundation.shape.CircleShape,
-                            color = accentColor.copy(alpha = 0.5f),
-                            modifier = Modifier.size(5.dp)
-                        ) {}
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            text = "$eventDate — ${event.type.label()} por ${event.userName}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = onContainerColor.copy(alpha = 0.8f)
-                        )
-                    }
                 }
             }
         }
     }
+}
+
+private fun monthsAgo(date: Date): String {
+    val days = TimeUnit.MILLISECONDS.toDays(Date().time - date.time)
+    return when {
+        days < 31 -> "há $days dias"
+        days < 365 -> "há ${days / 30} meses"
+        else -> "há ${days / 365} ano${if (days >= 730) "s" else ""}"
+    }
+}
+
+private fun segmentShape(index: Int, count: Int): RoundedCornerShape {
+    val top = if (index == 0) 20.dp else 6.dp
+    val bottom = if (index == count - 1) 20.dp else 6.dp
+    return RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom)
 }

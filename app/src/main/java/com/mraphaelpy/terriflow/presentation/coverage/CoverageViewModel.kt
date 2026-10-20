@@ -1,63 +1,117 @@
 package com.mraphaelpy.terriflow.presentation.coverage
 
+import android.content.Intent
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mraphaelpy.terriflow.domain.model.Territory
-import com.mraphaelpy.terriflow.domain.model.TerritoryEvent
+import com.mraphaelpy.terriflow.core.report.ReportExporter
+import com.mraphaelpy.terriflow.core.report.ReportFormat
+import com.mraphaelpy.terriflow.domain.model.AssignmentHistory
+import com.mraphaelpy.terriflow.domain.model.ResponsibleStats
+import com.mraphaelpy.terriflow.domain.model.ServiceYear
+import com.mraphaelpy.terriflow.domain.model.ServiceYearCoverage
+import com.mraphaelpy.terriflow.domain.model.TerritoryStatistics
+import com.mraphaelpy.terriflow.domain.repository.CongregationRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryEventRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
+import com.mraphaelpy.terriflow.presentation.components.territoryPalette
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import java.util.Date
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-enum class CoverageSortOption {
-    NEVER_WORKED,
-    OLDEST_COMPLETED_FIRST,
-    NEWEST_COMPLETED_FIRST,
-    MOST_WORKED
-}
-
-data class TerritoryCoverage(
-    val territory: Territory,
-    val lastCompletedDate: Date?,
-    val completionCount: Int,
-    val historyPreview: List<TerritoryEvent>
-)
+enum class CoverageTab { TERRITORIES, RESPONSIBLES }
 
 data class CoverageUiState(
+    val year: ServiceYear = ServiceYear.current(),
+    val coverage: ServiceYearCoverage? = null,
+    val staleCount: Int = 0,
     val coverages: List<TerritoryCoverage> = emptyList(),
     val sortOption: CoverageSortOption = CoverageSortOption.OLDEST_COMPLETED_FIRST,
+    val responsibles: List<ResponsibleStats> = emptyList(),
+    val tab: CoverageTab = CoverageTab.TERRITORIES,
+    val palette: Map<String, Color> = emptyMap(),
     val isLoading: Boolean = true
 )
 
 @HiltViewModel
 class CoverageViewModel @Inject constructor(
     territoryRepository: TerritoryRepository,
-    eventRepository: TerritoryEventRepository
+    private val eventRepository: TerritoryEventRepository,
+    private val congregationRepository: CongregationRepository,
+    private val reportExporter: ReportExporter
 ) : ViewModel() {
 
+    private val year = MutableStateFlow(ServiceYear.current())
     private val sortOption = MutableStateFlow(CoverageSortOption.OLDEST_COMPLETED_FIRST)
+    private val tab = MutableStateFlow(CoverageTab.TERRITORIES)
 
-    private val allCoverages = combine(
-        territoryRepository.observeAll(),
-        eventRepository.observeAll(),
-        CoverageCalculator::compute
-    )
+    private val _isSyncing = MutableStateFlow(true)
+    val isSyncing: StateFlow<Boolean> = _isSyncing
 
-    val uiState: StateFlow<CoverageUiState> = combine(allCoverages, sortOption) { coverages, option ->
+    private val _shareIntent = MutableStateFlow<Intent?>(null)
+    val shareIntent: StateFlow<Intent?> = _shareIntent
+
+    private val data = combine(territoryRepository.observeAll(), eventRepository.observeAll()) { territories, events ->
+        territories to AssignmentHistory.build(events)
+    }
+
+    val uiState: StateFlow<CoverageUiState> = combine(data, year, sortOption, tab) { (territories, periods), selectedYear, sort, selectedTab ->
         CoverageUiState(
-            coverages = CoverageCalculator.sort(coverages, option),
-            sortOption = option,
+            year = selectedYear,
+            coverage = TerritoryStatistics.coverage(territories, periods, selectedYear),
+            staleCount = TerritoryStatistics.notCompletedSince(territories, periods).size,
+            coverages = CoverageCalculator.sort(CoverageCalculator.compute(territories, periods, selectedYear), sort),
+            sortOption = sort,
+            responsibles = TerritoryStatistics.byResponsible(periods, territories),
+            tab = selectedTab,
+            palette = territoryPalette(territories),
             isLoading = false
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), CoverageUiState())
 
+    val availableYears: List<ServiceYear> = ServiceYear.current().let { listOf(it, it.previous(), it.previous().previous()) }
+
+    init {
+        viewModelScope.launch {
+            runCatching { eventRepository.syncAllFromRemote() }
+            _isSyncing.value = false
+        }
+    }
+
+    fun setYear(value: ServiceYear) {
+        year.value = value
+    }
+
     fun setSortOption(option: CoverageSortOption) {
         sortOption.value = option
+        tab.value = CoverageTab.TERRITORIES
+    }
+
+    fun setTab(value: CoverageTab) {
+        tab.value = value
+    }
+
+    fun exportS13(format: ReportFormat) {
+        viewModelScope.launch {
+            val (territories, periods) = data.first()
+            val selectedYear = year.value
+            val congregationName = runCatching {
+                congregationRepository.getCurrentCongregationId()?.let { congregationRepository.getById(it)?.name }
+            }.getOrNull()
+            val table = S13ReportBuilder.build(territories, periods, selectedYear, congregationName)
+            runCatching { reportExporter.export(table, format, "S-13 ${selectedYear.label.replace('/', '-')}") }
+                .onSuccess { _shareIntent.value = reportExporter.shareIntent(it, format) }
+        }
+    }
+
+    fun onShareHandled() {
+        _shareIntent.value = null
     }
 }
