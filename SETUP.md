@@ -1,4 +1,4 @@
-# TerriFlow — Configuração Inicial
+# TerriFlow — Configuração e Arquitetura
 
 ## 1. Firebase Console
 
@@ -10,83 +10,101 @@
 ## 2. Ativar serviços Firebase
 
 No console Firebase, ative:
-- **Authentication** → E-mail/senha
+- **Authentication** → E-mail/senha e Google
 - **Cloud Firestore** → Criar banco (modo produção)
 - **Cloud Messaging** → Já habilitado por padrão
 
-## 3. Firestore Security Rules
+## 3. Regras e índices do Firestore
 
-Cole o conteúdo de `firestore.rules` no console do Firestore → Regras.
-
-## 4. Firestore Indexes
-
-Implante os índices com Firebase CLI:
+Sempre que `firestore.rules` ou `firestore.indexes.json` mudarem, implante com o Firebase CLI:
 ```
-firebase deploy --only firestore:indexes
+firebase deploy --only firestore:rules,firestore:indexes
 ```
-ou cole o conteúdo de `firestore.indexes.json` manualmente no console.
+ou cole o conteúdo de cada arquivo manualmente no console.
 
-## 5. Criar primeiro usuário ADMIN
+## 4. Primeiro acesso
 
-Após registrar o primeiro usuário pelo app, acesse o Firestore no console e altere manualmente:
-```
-users/{userId}/role = "ADMIN"
-```
+1. Cadastre-se pelo app.
+2. Na tela de congregação, escolha **Criar congregação**: quem cria vira `SUPER_ADMIN`
+   e recebe o código de convite.
+3. Os demais irmãos se cadastram e usam **Entrar com código**; entram como `RESPONSIBLE`.
+4. Admins podem promover outros usuários na tela **Usuários**.
 
-## 6. Estrutura Firestore
+## 5. Estrutura do Firestore
 
 ```
-users/{userId}
-  name: string
-  email: string
-  role: "ADMIN" | "RESPONSIBLE"
-  createdAt: timestamp
-  active: boolean
-  fcmTokens: string[]
+users/{uid}                                   ponteiro global, gravado só pelo próprio usuário
+  congregationId: string
 
-territories/{territoryId}
-  code: string         (ex: T-00042, imutável)
-  name: string
-  description: string
-  location: string
-  notes: string
-  status: string       (AVAILABLE | ASSIGNED | IN_PROGRESS | PAUSED | COMPLETED | RETURNED | ARCHIVED)
-  currentResponsibleId: string | null
-  currentResponsibleName: string | null
-  createdAt: timestamp
-  assignedAt: timestamp | null
-  startedAt: timestamp | null
-  completedAt: timestamp | null
-  returnedAt: timestamp | null
-  updatedAt: timestamp
-  syncVersion: number
+congregations/{congId}
+  name, code (convite), createdAt, createdBy (uid do criador)
 
-territories/{territoryId}/events/{eventId}
-  territoryId: string
-  userId: string
-  userName: string
-  type: string         (CREATED | ASSIGNED | STARTED | PAUSED | RESUMED | COMPLETED | RETURNED | TRANSFERRED | UPDATED | ARCHIVED)
-  timestamp: timestamp
-  extra: map<string, string>
+congregations/{congId}/users/{uid}
+  name, email, role (SUPER_ADMIN | ADMIN | RESPONSIBLE), active, photoUrl,
+  congregationId, createdAt
+  fcmTokens: string[]                         alterado só via arrayUnion/arrayRemove
 
-notifications/{notificationId}
-  userId: string
-  title: string
-  body: string
-  type: string
-  territoryId: string | null
-  territoryCode: string | null
-  read: boolean
-  createdAt: timestamp
+congregations/{congId}/territories/{territoryId}
+  code (T-00042 ou personalizado), name, description, location, notes,
+  status (AVAILABLE | ASSIGNED | IN_PROGRESS | PAUSED | COMPLETED | RETURNED | ARCHIVED),
+  currentResponsibleId/Name/PhotoUrl, pastResponsibleIds,
+  createdAt, assignedAt, startedAt, completedAt, returnedAt, updatedAt,
+  latitude, longitude, boundaryPoints, blockPolygons, syncVersion
+
+congregations/{congId}/territories/{territoryId}/events/{eventId}   imutáveis
+  territoryId, userId, userName, type, timestamp, extra, congregationId
+
+congregations/{congId}/notifications/{notificationId}
+  userId ("" = toda a congregação), title, body, type, territoryId, territoryCode,
+  read, createdAt
 ```
 
-## 7. Estratégia de Sincronização
+## 6. Arquitetura
 
-**Offline-first**: Todas as escritas vão primeiro para o Room (local).
-**Sync para nuvem**: WorkManager executa a cada 15 minutos quando há internet.
-**Resolução de conflitos**: `syncVersion` determina quem vence — versão maior prevalece. Se local está não-sincronizado e remoto tem versão maior, remoto vence (assumindo que o servidor é fonte da verdade para dados de outros usuários). Alterações locais pendentes têm prioridade sobre dados remotos do mesmo ID.
-**Idempotência de eventos**: Verificação de existência antes de inserir evita duplicação.
+Clean Architecture com Hilt, em três camadas. As dependências apontam sempre para o domínio.
 
-## 8. Permissão de notificações (Android 13+)
+```
+presentation/   Telas Compose + ViewModels. Só conhece interfaces e casos de uso do domínio.
+domain/         Kotlin puro (sem Android/Firebase), coberto por testes unitários.
+  model/          Entidades, DomainException/AuthException, TerritoryCode
+  policy/         TerritoryActionPolicy: quem pode fazer cada ação e em qual status
+  repository/     Interfaces dos repositórios
+  service/        Interfaces de serviços de plataforma (SystemNotifier)
+  usecase/        Regras de negócio (atribuir, iniciar, finalizar, devolver, importar...)
+data/           Implementações: Room (local), Firestore (remoto) e mesclagem entre eles
+di/             Módulos Hilt (bindings de interfaces, escopo de aplicação)
+sync/           Workers e listeners em tempo real
+core/           Utilitários (KML, coordenadas, imagem, atualizador do app)
+```
 
-O app solicita permissão `POST_NOTIFICATIONS` automaticamente. Certifique-se de aceitá-la na primeira execução.
+Regras práticas para novas funcionalidades:
+- **Regra de negócio** vai em um caso de uso; a UI não decide permissões.
+  Para ações em território, use `TerritoryActionGuard.authorize(...)` e, para exibir
+  botões, `TerritoryActionPolicy.allowedActions(...)` — as duas usam a mesma regra.
+- **Erros para o usuário** são `DomainException`/`AuthException` com mensagem pronta;
+  o ViewModel apenas exibe `e.message`.
+- **Acesso ao Firebase** só na camada `data/`, sempre recebido por injeção.
+- **Eventos antes do território**: ao alterar o responsável, grave o evento antes do
+  território; as regras só aceitam eventos de um não-admin enquanto ele é o responsável.
+
+## 7. Estratégia de sincronização
+
+- **Offline-first**: toda escrita vai primeiro para o Room; a UI observa o Room.
+- **Envio**: o `RemoteWriter` emite a gravação no Firestore em segundo plano (o próprio
+  Firestore a enfileira enquanto estiver offline). Registros sem confirmação ficam com
+  `synced = false` e o `SyncWorker` (a cada 15 min, com internet) os reenvia.
+- **Recebimento**: o `RealtimeSyncManager` mantém listeners de territórios, notificações
+  e eventos recentes enquanto houver usuário logado, reiniciando a cada login/logout.
+- **Conflitos**: alterações locais pendentes nunca são sobrescritas; fora isso, a versão
+  remota vence quando `syncVersion` for igual ou maior (`TerritoryRemoteMerger`).
+- **Eventos**: imutáveis no servidor; antes de reenviar um pendente verifica-se se já existe.
+
+## 8. Testes
+
+```
+./gradlew testDebugUnitTest
+```
+
+## 9. Permissão de notificações (Android 13+)
+
+O app solicita `POST_NOTIFICATIONS` automaticamente na primeira execução.
