@@ -49,14 +49,20 @@ congregations/{congId}/territories/{territoryId}
   status (AVAILABLE | ASSIGNED | IN_PROGRESS | PAUSED | COMPLETED | RETURNED | ARCHIVED),
   currentResponsibleId/Name/PhotoUrl, pastResponsibleIds,
   createdAt, assignedAt, startedAt, completedAt, returnedAt, updatedAt,
-  latitude, longitude, boundaryPoints, blockPolygons, syncVersion
+  latitude, longitude, boundaryPoints, blockPolygons,
+  completedBlocks (índices das quadras feitas no ciclo atual), syncVersion
 
 congregations/{congId}/territories/{territoryId}/events/{eventId}   imutáveis
   territoryId, userId, userName, type, timestamp, extra, congregationId
 
+congregations/{congId}/territories/{territoryId}/notes/{noteId}   só admins e dirigente atual
+  kind (DO_NOT_CALL | FIELD_NOTE), address, text, authorId, authorName, createdAt
+
+congregations/{congId}/campaigns/{campaignId}
+  name, start, end, createdBy
+
 congregations/{congId}/notifications/{notificationId}
-  userId ("" = toda a congregação), title, body, type, territoryId, territoryCode,
-  read, createdAt
+  userId (destinatário), title, body, type, territoryId, territoryCode, read, createdAt
 ```
 
 ## 6. Arquitetura
@@ -99,12 +105,22 @@ Regras práticas para novas funcionalidades:
   remota vence quando `syncVersion` for igual ou maior (`TerritoryRemoteMerger`).
 - **Eventos**: imutáveis no servidor; antes de reenviar um pendente verifica-se se já existe.
 
-## 8. Testes
+## 8. Relatórios e acompanhamento
+
+- **Ano de serviço**: de 1º de setembro a 31 de agosto (`ServiceYear`).
+- **Designações** são reconstruídas a partir dos eventos (`AssignmentHistory`) e alimentam
+  a meta de cobertura, o alerta de 12 meses, os tempos médios e o **S-13** (PDF/CSV).
+- **Auditoria** e **Cobertura** baixam o histórico de todos os territórios ao abrir.
+- **Lembretes** ao dirigente: 7 e 30 dias sem iniciar; 2 e 4 meses com o território.
+  Admins podem "Cobrar devolução" a qualquer momento.
+- **Limite sugerido** de territórios ativos por dirigente: `TerritoryRotationHelper.MAX_ACTIVE_PER_RESPONSIBLE`.
+
+## 9. Testes
 
 ```
 ./gradlew testDebugUnitTest
 ```
 
-## 9. Permissão de notificações (Android 13+)
+## 10. Permissão de notificações (Android 13+)
 
 O app solicita `POST_NOTIFICATIONS` automaticamente na primeira execução.
