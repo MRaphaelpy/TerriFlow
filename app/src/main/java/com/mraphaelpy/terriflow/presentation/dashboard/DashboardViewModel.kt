@@ -12,6 +12,10 @@ import com.mraphaelpy.terriflow.domain.repository.AuthRepository
 import com.mraphaelpy.terriflow.domain.repository.NotificationRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryEventRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
+import com.mraphaelpy.terriflow.domain.repository.UserRepository
+import com.mraphaelpy.terriflow.domain.usecase.user.RenameUserUseCase
+import com.mraphaelpy.terriflow.domain.usecase.user.SyncResponsibleProfilesUseCase
+import com.mraphaelpy.terriflow.domain.usecase.user.UpdateProfilePhotoUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -53,7 +57,11 @@ class DashboardViewModel @Inject constructor(
     private val territoryRepository: TerritoryRepository,
     private val eventRepository: TerritoryEventRepository,
     private val notificationRepository: NotificationRepository,
-    private val photoEncoder: ProfilePhotoEncoder
+    private val userRepository: UserRepository,
+    private val photoEncoder: ProfilePhotoEncoder,
+    private val renameUser: RenameUserUseCase,
+    private val updateProfilePhoto: UpdateProfilePhotoUseCase,
+    private val syncResponsibleProfiles: SyncResponsibleProfilesUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DashboardUiState())
@@ -84,18 +92,21 @@ class DashboardViewModel @Inject constructor(
     fun updateProfilePicture(uri: Uri) {
         viewModelScope.launch {
             runCatching {
-                photoEncoder.encode(uri)?.let { authRepository.updatePhotoUrl(it) }
+                photoEncoder.encode(uri)?.let { updateProfilePhoto(it) }
             }
         }
     }
 
     fun updateMyName(newName: String) {
-        viewModelScope.launch { runCatching { authRepository.updateName(newName) } }
+        val userId = authRepository.currentUserId ?: return
+        viewModelScope.launch { runCatching { renameUser(userId, newName) } }
     }
 
     private suspend fun syncFromRemote() {
+        runCatching { userRepository.syncFromRemote() }
         runCatching { territoryRepository.syncFromRemote() }
         runCatching { notificationRepository.syncFromRemote() }
+        runCatching { syncResponsibleProfiles() }
     }
 
     private fun observeDashboard() {

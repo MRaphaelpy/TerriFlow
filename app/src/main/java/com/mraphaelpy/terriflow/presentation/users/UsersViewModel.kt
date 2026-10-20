@@ -7,6 +7,7 @@ import com.mraphaelpy.terriflow.domain.model.UserRole
 import com.mraphaelpy.terriflow.domain.model.label
 import com.mraphaelpy.terriflow.domain.repository.AuthRepository
 import com.mraphaelpy.terriflow.domain.repository.UserRepository
+import com.mraphaelpy.terriflow.domain.usecase.user.RenameUserUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -34,7 +35,8 @@ data class UsersUiState(
 @HiltViewModel
 class UsersViewModel @Inject constructor(
     private val userRepository: UserRepository,
-    private val authRepository: AuthRepository
+    private val authRepository: AuthRepository,
+    private val renameUser: RenameUserUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(UsersUiState())
@@ -131,11 +133,7 @@ class UsersViewModel @Inject constructor(
 
         viewModelScope.launch {
             runCatching {
-                if (isSelf) {
-                    authRepository.updateName(trimmed)
-                } else {
-                    userRepository.updateUserName(user.id, trimmed)
-                }
+                renameUser(user.id, trimmed)
             }.onSuccess {
                 _uiState.update { it.copy(successMessage = "Nome atualizado para \"$trimmed\" com sucesso") }
             }.onFailure { e ->

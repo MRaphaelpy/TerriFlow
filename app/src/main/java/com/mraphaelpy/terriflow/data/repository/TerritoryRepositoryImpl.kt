@@ -11,12 +11,14 @@ import com.mraphaelpy.terriflow.di.ApplicationScope
 import com.mraphaelpy.terriflow.domain.model.Territory
 import com.mraphaelpy.terriflow.domain.model.TerritoryCode
 import com.mraphaelpy.terriflow.domain.model.TerritoryStatus
+import com.mraphaelpy.terriflow.domain.model.User
 import com.mraphaelpy.terriflow.domain.repository.CongregationRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import java.util.Date
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -104,6 +106,23 @@ class TerritoryRepositoryImpl @Inject constructor(
                 remoteSource.delete(congregationId, id)
             }.onFailure { Log.e(TAG, "Falha ao apagar território $id no servidor", it) }
         }
+    }
+
+    override suspend fun updateResponsibleProfile(user: User): Int {
+        val outdated = territoryDao.getByResponsible(user.id)
+            .map { it.toDomain() }
+            .filter { it.currentResponsibleName != user.name || it.currentResponsiblePhotoUrl != user.photoUrl }
+        val now = Date()
+        outdated.forEach { territory ->
+            save(
+                territory.copy(
+                    currentResponsibleName = user.name,
+                    currentResponsiblePhotoUrl = user.photoUrl,
+                    updatedAt = now
+                )
+            )
+        }
+        return outdated.size
     }
 
     private fun push(congregationId: String, territory: Territory, currentVersion: Long) {

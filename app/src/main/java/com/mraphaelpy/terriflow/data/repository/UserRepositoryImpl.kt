@@ -1,7 +1,6 @@
 package com.mraphaelpy.terriflow.data.repository
 
 import android.util.Log
-import com.mraphaelpy.terriflow.data.local.dao.TerritoryDao
 import com.mraphaelpy.terriflow.data.local.dao.UserDao
 import com.mraphaelpy.terriflow.data.local.entity.UserEntity
 import com.mraphaelpy.terriflow.data.remote.source.FirestoreUserSource
@@ -16,7 +15,6 @@ import javax.inject.Singleton
 @Singleton
 class UserRepositoryImpl @Inject constructor(
     private val userDao: UserDao,
-    private val territoryDao: TerritoryDao,
     private val remoteSource: FirestoreUserSource,
     private val congregationRepository: CongregationRepository
 ) : UserRepository {
@@ -40,7 +38,6 @@ class UserRepositoryImpl @Inject constructor(
         val congregationId = congregationRepository.getCurrentCongregationId()
         if (congregationId != null) remoteSource.upsert(congregationId, user)
         userDao.upsert(UserEntity.fromDomain(user, synced = congregationId != null))
-        territoryDao.updateResponsibleName(user.id, user.name)
     }
 
     override suspend fun updateUserName(userId: String, newName: String) {

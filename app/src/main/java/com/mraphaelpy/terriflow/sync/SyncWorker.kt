@@ -15,6 +15,7 @@ import com.mraphaelpy.terriflow.domain.repository.NotificationRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryEventRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
 import com.mraphaelpy.terriflow.domain.repository.UserRepository
+import com.mraphaelpy.terriflow.domain.usecase.user.SyncResponsibleProfilesUseCase
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.util.concurrent.TimeUnit
@@ -26,7 +27,8 @@ class SyncWorker @AssistedInject constructor(
     private val territoryRepository: TerritoryRepository,
     private val eventRepository: TerritoryEventRepository,
     private val userRepository: UserRepository,
-    private val notificationRepository: NotificationRepository
+    private val notificationRepository: NotificationRepository,
+    private val syncResponsibleProfiles: SyncResponsibleProfilesUseCase
 ) : CoroutineWorker(context, workerParams) {
 
     override suspend fun doWork(): Result {
@@ -36,6 +38,7 @@ class SyncWorker @AssistedInject constructor(
             territoryRepository.syncFromRemote()
             eventRepository.syncPendingToRemote()
             notificationRepository.syncFromRemote()
+            syncResponsibleProfiles()
         }.fold(
             onSuccess = { Result.success() },
             onFailure = {

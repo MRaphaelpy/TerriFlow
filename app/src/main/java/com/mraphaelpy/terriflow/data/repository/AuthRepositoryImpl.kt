@@ -10,7 +10,6 @@ import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.messaging.FirebaseMessaging
 import com.mraphaelpy.terriflow.data.local.AppDatabase
-import com.mraphaelpy.terriflow.data.local.dao.TerritoryDao
 import com.mraphaelpy.terriflow.data.local.dao.UserDao
 import com.mraphaelpy.terriflow.data.local.entity.UserEntity
 import com.mraphaelpy.terriflow.data.remote.source.FirestoreUserSource
@@ -39,7 +38,6 @@ class AuthRepositoryImpl @Inject constructor(
     private val auth: FirebaseAuth,
     private val messaging: FirebaseMessaging,
     private val userDao: UserDao,
-    private val territoryDao: TerritoryDao,
     private val remoteSource: FirestoreUserSource,
     private val congregationRepository: CongregationRepository,
     private val appDatabase: AppDatabase
@@ -139,8 +137,7 @@ class AuthRepositoryImpl @Inject constructor(
             val request = UserProfileChangeRequest.Builder().setDisplayName(trimmed).build()
             auth.currentUser?.updateProfile(request)?.await()
         }
-        val updated = updateProfile { it.copy(name = trimmed) } ?: return
-        territoryDao.updateResponsibleName(updated.id, trimmed)
+        updateProfile { it.copy(name = trimmed) }
     }
 
     override suspend fun resolveAndSaveCongregationId(): String? =

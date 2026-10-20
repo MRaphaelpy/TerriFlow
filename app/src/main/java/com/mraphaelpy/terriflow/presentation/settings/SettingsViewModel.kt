@@ -13,6 +13,8 @@ import com.mraphaelpy.terriflow.domain.repository.AuthRepository
 import com.mraphaelpy.terriflow.domain.repository.CongregationRepository
 import com.mraphaelpy.terriflow.domain.repository.SettingsRepository
 import com.mraphaelpy.terriflow.domain.repository.ThemeMode
+import com.mraphaelpy.terriflow.domain.usecase.user.RenameUserUseCase
+import com.mraphaelpy.terriflow.domain.usecase.user.UpdateProfilePhotoUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -39,6 +41,8 @@ class SettingsViewModel @Inject constructor(
     private val congregationRepository: CongregationRepository,
     private val authRepository: AuthRepository,
     private val photoEncoder: ProfilePhotoEncoder,
+    private val renameUser: RenameUserUseCase,
+    private val updateProfilePhoto: UpdateProfilePhotoUseCase,
     val updateManager: AppUpdateManager
 ) : ViewModel() {
 
@@ -89,14 +93,15 @@ class SettingsViewModel @Inject constructor(
         val trimmed = newName.trim()
         if (trimmed.isBlank()) return
         viewModelScope.launch {
-            runCatching { authRepository.updateName(trimmed) }
+            val userId = authRepository.currentUserId ?: return@launch
+            runCatching { renameUser(userId, trimmed) }
         }
     }
 
     fun updateProfilePicture(uri: Uri) {
         viewModelScope.launch {
             runCatching {
-                photoEncoder.encode(uri)?.let { authRepository.updatePhotoUrl(it) }
+                photoEncoder.encode(uri)?.let { updateProfilePhoto(it) }
             }
         }
     }

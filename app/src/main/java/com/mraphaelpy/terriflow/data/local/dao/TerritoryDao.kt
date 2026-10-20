@@ -76,8 +76,8 @@ interface TerritoryDao {
     @Query("SELECT code FROM territories WHERE deletedAt IS NULL")
     suspend fun getAllCodes(): List<String>
 
-    @Query("UPDATE territories SET currentResponsibleName = :newName WHERE currentResponsibleId = :userId")
-    suspend fun updateResponsibleName(userId: String, newName: String)
+    @Query("SELECT * FROM territories WHERE currentResponsibleId = :userId AND deletedAt IS NULL")
+    suspend fun getByResponsible(userId: String): List<TerritoryEntity>
 
     @Query("DELETE FROM territories WHERE id = :id")
     suspend fun deletePermanent(id: String)

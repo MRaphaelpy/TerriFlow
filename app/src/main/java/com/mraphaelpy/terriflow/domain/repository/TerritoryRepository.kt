@@ -2,6 +2,7 @@ package com.mraphaelpy.terriflow.domain.repository
 
 import com.mraphaelpy.terriflow.domain.model.Territory
 import com.mraphaelpy.terriflow.domain.model.TerritoryStatus
+import com.mraphaelpy.terriflow.domain.model.User
 import kotlinx.coroutines.flow.Flow
 
 interface TerritoryRepository {
@@ -24,4 +25,6 @@ interface TerritoryRepository {
     suspend fun getInProgress(): List<Territory>
 
     suspend fun delete(id: String)
+
+    suspend fun updateResponsibleProfile(user: User): Int
 }
