@@ -28,6 +28,7 @@ import com.mraphaelpy.terriflow.domain.usecase.territory.DeleteTerritoryUseCase
 import com.mraphaelpy.terriflow.domain.usecase.territory.PauseTerritoryUseCase
 import com.mraphaelpy.terriflow.domain.usecase.territory.ReturnTerritoryUseCase
 import com.mraphaelpy.terriflow.domain.usecase.territory.StartTerritoryUseCase
+import com.mraphaelpy.terriflow.domain.usecase.territory.ToggleBlockUseCase
 import com.mraphaelpy.terriflow.presentation.components.territoryPalette
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -88,7 +89,8 @@ class TerritoryDetailViewModel @Inject constructor(
     private val remindResponsible: RemindResponsibleUseCase,
     private val noteRepository: TerritoryNoteRepository,
     private val addTerritoryNote: AddTerritoryNoteUseCase,
-    private val deleteTerritoryNote: DeleteTerritoryNoteUseCase
+    private val deleteTerritoryNote: DeleteTerritoryNoteUseCase,
+    private val toggleBlock: ToggleBlockUseCase
 ) : ViewModel() {
 
     private val territoryId: String = checkNotNull(savedStateHandle["territoryId"])
@@ -225,6 +227,13 @@ class TerritoryDetailViewModel @Inject constructor(
     fun deleteNote(note: TerritoryNote) = performAction {
         deleteTerritoryNote(note)
         _uiState.update { it.copy(actionSuccess = "Anotação removida") }
+    }
+
+    fun toggleBlock(index: Int) {
+        viewModelScope.launch {
+            runCatching { toggleBlock(territoryId, index) }
+                .onFailure { e -> _uiState.update { it.copy(error = e.message) } }
+        }
     }
 
     fun remind() = performAction {

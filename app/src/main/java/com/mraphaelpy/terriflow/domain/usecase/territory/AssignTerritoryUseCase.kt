@@ -47,6 +47,7 @@ class AssignTerritoryUseCase @Inject constructor(
                 assignedAt = now,
                 startedAt = null,
                 completedAt = null,
+                completedBlocks = emptySet(),
                 updatedAt = now
             )
         )

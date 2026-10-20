@@ -159,4 +159,28 @@ class TerritoryWorkflowUseCasesTest {
         assertEquals(TerritoryStatus.IN_PROGRESS, saved.captured.status)
         assertEquals(startedAt, saved.captured.startedAt)
     }
+
+    @Test
+    fun `marcar quadra alterna o estado e reatribuir zera o progresso`() = runTest {
+        val blocks = listOf(
+            listOf(com.mraphaelpy.terriflow.domain.model.LatLng(0.0, 0.0), com.mraphaelpy.terriflow.domain.model.LatLng(0.0, 1.0), com.mraphaelpy.terriflow.domain.model.LatLng(1.0, 1.0)),
+            listOf(com.mraphaelpy.terriflow.domain.model.LatLng(2.0, 2.0), com.mraphaelpy.terriflow.domain.model.LatLng(2.0, 3.0), com.mraphaelpy.terriflow.domain.model.LatLng(3.0, 3.0))
+        )
+        val territory = Fixtures.territory(TerritoryStatus.IN_PROGRESS, responsible = publisher)
+            .copy(blockPolygons = blocks, completedBlocks = setOf(0))
+        given(publisher, territory)
+        val saved = slot<Territory>()
+        coEvery { territoryRepository.save(capture(saved)) } answers { saved.captured }
+
+        ToggleBlockUseCase(guard, territoryRepository)(territory.id, 1)
+        assertEquals(setOf(0, 1), saved.captured.completedBlocks)
+
+        ToggleBlockUseCase(guard, territoryRepository)(territory.id, 0)
+        assertEquals(emptySet<Int>(), saved.captured.completedBlocks)
+
+        given(admin, territory.copy(status = TerritoryStatus.COMPLETED))
+        coEvery { userRepository.getById(otherPublisher.id) } returns otherPublisher
+        AssignTerritoryUseCase(guard, territoryRepository, eventRepository, notificationRepository, userRepository)(territory.id, otherPublisher.id)
+        assertTrue(saved.captured.completedBlocks.isEmpty())
+    }
 }

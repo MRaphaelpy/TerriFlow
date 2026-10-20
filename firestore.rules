@@ -59,7 +59,7 @@ service cloud.firestore {
         .hasOnly([
           'status', 'assignedAt', 'startedAt', 'completedAt', 'returnedAt', 'updatedAt', 'notes', 'syncVersion',
           'currentResponsibleId', 'currentResponsibleName', 'currentResponsiblePhotoUrl',
-          'pastResponsibleIds'
+          'pastResponsibleIds', 'completedBlocks'
         ]);
     }
 

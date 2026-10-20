@@ -43,9 +43,13 @@ data class Territory(
     val longitude: Double? = null,
     val boundaryPoints: List<LatLng> = emptyList(),
     val blockPolygons: List<List<LatLng>> = emptyList(),
-    val pastResponsibleIds: List<String> = emptyList()
+    val pastResponsibleIds: List<String> = emptyList(),
+    val completedBlocks: Set<Int> = emptySet()
 ) {
     val hasLocation: Boolean get() = latitude != null && longitude != null
     val hasBoundary: Boolean get() = boundaryPoints.size >= 3
     val hasBlocks: Boolean get() = blockPolygons.isNotEmpty()
+
+    /** Quadras concluídas no ciclo atual, ignorando índices que não existem mais. */
+    val completedBlockCount: Int get() = completedBlocks.count { it in blockPolygons.indices }
 }

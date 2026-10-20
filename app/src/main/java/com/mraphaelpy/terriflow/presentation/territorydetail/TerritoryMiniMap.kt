@@ -55,11 +55,13 @@ internal fun TerritoryMiniMap(
     color: Color,
     boundaryPoints: List<com.mraphaelpy.terriflow.domain.model.LatLng> = emptyList(),
     blockPolygons: List<List<com.mraphaelpy.terriflow.domain.model.LatLng>> = emptyList(),
+    completedBlocks: Set<Int> = emptySet(),
     onViewMap: () -> Unit
 ) {
     val context = LocalContext.current
     val markerColor = color.toArgb()
     val fillColor = color.copy(alpha = 0.28f).toArgb()
+    val completedFillColor = color.copy(alpha = 0.7f).toArgb()
     val outlineColor = color.toArgb()
     val hasLocation = lat != null && lng != null
     val hasBoundary = boundaryPoints.size >= 3
@@ -107,7 +109,7 @@ internal fun TerritoryMiniMap(
                         }
                     },
                     update = { mapView ->
-                        val currentKey = "$lat,$lng,$markerColor,$showBlocks,${boundaryPoints.size},${blockPolygons.size}"
+                        val currentKey = "$lat,$lng,$markerColor,$showBlocks,${boundaryPoints.size},${blockPolygons.size},${completedBlocks.sorted()}"
                         if (currentKey != lastDrawnKey) {
                             lastDrawnKey = currentKey
                             mapView.overlays.clear()
@@ -128,12 +130,12 @@ internal fun TerritoryMiniMap(
                             }
 
                             if (showBlocks && blockPolygons.isNotEmpty()) {
-                                blockPolygons.forEach { block ->
+                                blockPolygons.forEachIndexed { index, block ->
                                     val poly = Polygon().apply {
                                         val pts = block.map { GeoPoint(it.lat, it.lng) }.toMutableList()
                                         if (pts.isNotEmpty()) pts.add(pts.first())
                                         points = pts
-                                        fillPaint.color = fillColor
+                                        fillPaint.color = if (index in completedBlocks) completedFillColor else fillColor
                                         outlinePaint.color = outlineColor
                                         outlinePaint.strokeWidth = 2f
                                     }

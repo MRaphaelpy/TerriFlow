@@ -266,6 +266,15 @@ fun TerritoryDetailScreen(
 
             TerritoryInfoGroup(territory)
 
+            if (territory.hasBlocks) {
+                BlockProgressSection(
+                    territory = territory,
+                    color = color,
+                    canMark = uiState.can(TerritoryAction.MARK_BLOCK),
+                    onToggle = viewModel::toggleBlock
+                )
+            }
+
             if (uiState.canAccessNotes) {
                 TerritoryNotesSection(
                     notes = uiState.notes,
@@ -282,6 +291,7 @@ fun TerritoryDetailScreen(
                 color = color,
                 boundaryPoints = territory.boundaryPoints,
                 blockPolygons = territory.blockPolygons,
+                completedBlocks = territory.completedBlocks,
                 onViewMap = { onNavigateToMap(territory.id) }
             )
 

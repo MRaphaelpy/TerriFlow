@@ -30,6 +30,8 @@ object TerritoryActionPolicy {
             TerritoryAction.PAUSE -> canOperate && status == TerritoryStatus.IN_PROGRESS
             TerritoryAction.COMPLETE -> canOperate && status in completableStatuses
             TerritoryAction.RETURN -> canOperate && status in returnableStatuses
+            TerritoryAction.MARK_BLOCK -> canOperate && territory.hasBlocks &&
+                (status == TerritoryStatus.IN_PROGRESS || status == TerritoryStatus.PAUSED)
             TerritoryAction.REMIND -> isAdmin && status in remindableStatuses &&
                 territory.currentResponsibleId != null && territory.currentResponsibleId != user.id
             TerritoryAction.CREATE, TerritoryAction.EDIT, TerritoryAction.DELETE -> isAdmin

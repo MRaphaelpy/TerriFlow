@@ -75,6 +75,7 @@ private val FabBottomOffset = 32.dp
 private val OuterCorner = 24.dp
 private val InnerCorner = 6.dp
 private val PressedCorner = 32.dp
+private val BlockProgressStatuses = setOf(TerritoryStatus.IN_PROGRESS, TerritoryStatus.PAUSED)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -337,6 +338,13 @@ private fun TerritoryListItem(
                     }
                 }
                 ResponsibleLine(territory)
+                if (territory.hasBlocks && territory.status in BlockProgressStatuses) {
+                    Text(
+                        "${territory.completedBlockCount}/${territory.blockPolygons.size} quadras",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
 
             if (!territory.hasLocation && !territory.hasBoundary && !territory.hasBlocks) {

@@ -38,6 +38,13 @@ class Converters {
     }
 
     @TypeConverter
+    fun fromIntList(value: String?): List<Int> =
+        value.orEmpty().split(",").mapNotNull { it.trim().toIntOrNull() }
+
+    @TypeConverter
+    fun toIntList(list: List<Int>?): String = list?.joinToString(",") ?: ""
+
+    @TypeConverter
     fun fromLatLngList(value: String?): List<LatLng> {
         if (value.isNullOrEmpty()) return emptyList()
         return value.split(";").mapNotNull {

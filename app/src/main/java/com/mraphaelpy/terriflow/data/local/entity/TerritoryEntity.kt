@@ -30,6 +30,7 @@ data class TerritoryEntity(
     val boundaryPoints: List<LatLng> = emptyList(),
     val blockPolygons: List<List<LatLng>> = emptyList(),
     val pastResponsibleIds: List<String> = emptyList(),
+    val completedBlocks: List<Int> = emptyList(),
     val synced: Boolean = false,
     val deletedAt: Date? = null,
     val syncVersion: Long = 0L
@@ -55,7 +56,8 @@ data class TerritoryEntity(
         longitude = longitude,
         boundaryPoints = boundaryPoints,
         blockPolygons = blockPolygons,
-        pastResponsibleIds = pastResponsibleIds
+        pastResponsibleIds = pastResponsibleIds,
+        completedBlocks = completedBlocks.toSet()
     )
 
     companion object {
@@ -81,6 +83,7 @@ data class TerritoryEntity(
             boundaryPoints = territory.boundaryPoints,
             blockPolygons = territory.blockPolygons,
             pastResponsibleIds = territory.pastResponsibleIds,
+            completedBlocks = territory.completedBlocks.sorted(),
             synced = synced
         )
     }
