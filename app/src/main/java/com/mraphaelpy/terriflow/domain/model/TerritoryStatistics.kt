@@ -39,7 +39,6 @@ object TerritoryStatistics {
         return ServiceYearCoverage(year, territories.size, worked, pending)
     }
 
-    /** Territórios sem conclusão nos últimos [months] meses (inclui os nunca trabalhados). */
     fun notCompletedSince(
         territories: List<Territory>,
         periodsByTerritory: Map<String, List<AssignmentPeriod>>,
@@ -86,7 +85,6 @@ object TerritoryStatistics {
             .sortedWith(compareByDescending<ResponsibleStats> { it.completed }.thenBy { it.name })
     }
 
-    /** Situação de cada território dentro do período da campanha. */
     fun campaignCoverage(
         territories: List<Territory>,
         periodsByTerritory: Map<String, List<AssignmentPeriod>>,

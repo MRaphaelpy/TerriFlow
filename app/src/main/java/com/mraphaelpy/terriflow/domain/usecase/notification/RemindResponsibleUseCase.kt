@@ -10,7 +10,6 @@ import java.util.Date
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
-/** Administrador pede ao dirigente que conclua ou devolva o território. */
 class RemindResponsibleUseCase @Inject constructor(
     private val guard: TerritoryActionGuard,
     private val notificationRepository: NotificationRepository

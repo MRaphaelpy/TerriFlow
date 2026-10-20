@@ -12,13 +12,6 @@ import java.util.Date
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
-/**
- * Lembra o dirigente dos territórios que estão com ele há muito tempo.
- *
- * Cada lembrete corresponde a um marco (ex.: 2 e 4 meses desde a designação) e
- * tem id determinístico, então é enviado uma única vez por designação, mesmo que
- * o worker rode várias vezes ao dia ou em vários aparelhos.
- */
 class CheckStaleTerritoriesUseCase @Inject constructor(
     private val authRepository: AuthRepository,
     private val territoryRepository: TerritoryRepository,

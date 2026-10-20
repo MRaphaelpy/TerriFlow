@@ -11,10 +11,6 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Overlay
 
-/**
- * Escreve o número de cada quadra (1, 2, 3...) como texto simples no centro do desenho.
- * Só desenha a partir de [minZoom] para não poluir o mapa quando há muitos territórios.
- */
 class BlockLabelsOverlay(
     blocks: List<List<LatLng>>,
     density: Float,

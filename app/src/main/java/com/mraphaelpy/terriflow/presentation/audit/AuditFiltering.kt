@@ -82,7 +82,6 @@ object AuditGrouping {
         .let { it.get(Calendar.YEAR) * 1000 + it.get(Calendar.DAY_OF_YEAR) }
 }
 
-/** Descreve as alterações registradas num evento de edição ("Nome: A → B"). */
 fun describeChanges(event: TerritoryEvent): List<String> {
     if (event.type != EventType.UPDATED) return emptyList()
     val labels = listOf(

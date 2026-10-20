@@ -3,7 +3,6 @@ package com.mraphaelpy.terriflow.domain.model
 import java.util.Date
 import java.util.concurrent.TimeUnit
 
-/** Uma designação de território: de quando foi entregue a um dirigente até a conclusão ou devolução. */
 data class AssignmentPeriod(
     val territoryId: String,
     val responsibleId: String?,
@@ -24,7 +23,6 @@ data class AssignmentPeriod(
 
 object AssignmentHistory {
 
-    /** Reconstrói as designações de cada território a partir do histórico de eventos. */
     fun build(events: List<TerritoryEvent>): Map<String, List<AssignmentPeriod>> =
         events.groupBy { it.territoryId }.mapValues { (_, territoryEvents) -> buildForTerritory(territoryEvents) }
 

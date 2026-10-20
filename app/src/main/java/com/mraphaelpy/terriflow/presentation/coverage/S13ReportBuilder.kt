@@ -10,7 +10,6 @@ import com.mraphaelpy.terriflow.domain.model.Territory
 import com.mraphaelpy.terriflow.domain.model.TerritoryCode
 import com.mraphaelpy.terriflow.domain.model.TerritoryStatistics
 
-/** Registro de designação de território (modelo S-13) de um ano de serviço. */
 object S13ReportBuilder {
 
     fun build(

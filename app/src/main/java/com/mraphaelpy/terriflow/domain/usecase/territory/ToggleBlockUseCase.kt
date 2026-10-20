@@ -5,7 +5,6 @@ import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
 import java.util.Date
 import javax.inject.Inject
 
-/** Marca ou desmarca uma quadra como concluída no ciclo atual do território. */
 class ToggleBlockUseCase @Inject constructor(
     private val guard: TerritoryActionGuard,
     private val territoryRepository: TerritoryRepository

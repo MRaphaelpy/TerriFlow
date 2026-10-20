@@ -38,7 +38,6 @@ object TerritoryActionPolicy {
         }
     }
 
-    /** Anotações (inclusive "não visitar") são restritas a admins e ao dirigente atual. */
     fun canAccessNotes(user: User?, territory: Territory): Boolean =
         user != null && user.active && (user.isAdmin || territory.currentResponsibleId == user.id)
 

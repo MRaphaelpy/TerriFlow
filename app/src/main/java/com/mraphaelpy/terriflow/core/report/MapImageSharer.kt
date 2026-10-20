@@ -12,7 +12,6 @@ import android.view.View
 import androidx.core.content.FileProvider
 import java.io.File
 
-/** Gera uma imagem PNG de um mapa já desenhado na tela, com uma faixa de título, e a compartilha. */
 object MapImageSharer {
 
     fun share(context: Context, mapView: View, title: String, subtitle: String) {

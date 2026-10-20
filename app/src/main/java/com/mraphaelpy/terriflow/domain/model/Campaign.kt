@@ -3,7 +3,6 @@ package com.mraphaelpy.terriflow.domain.model
 import java.util.Date
 import java.util.UUID
 
-/** Período especial de pregação (ex.: Celebração) em que se acompanha a cobertura. */
 data class Campaign(
     val id: String = UUID.randomUUID().toString(),
     val name: String,

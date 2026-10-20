@@ -35,7 +35,6 @@ val Territory.mapPoints: List<LatLng> get() = shapePoints + listOfNotNull(center
 
 fun List<Territory>.bounds(): GeoBounds? = GeoBounds.of(flatMap { it.mapPoints })
 
-/** Centroide de área do polígono (cai dentro de quadras irregulares melhor que a média dos vértices). */
 fun polygonCentroid(points: List<LatLng>): LatLng? {
     val ring = if (points.size > 1 && points.first() == points.last()) points.dropLast(1) else points
     if (ring.isEmpty()) return null

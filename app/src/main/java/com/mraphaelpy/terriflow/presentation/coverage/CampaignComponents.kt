@@ -146,7 +146,6 @@ internal fun CreateCampaignDialog(onCreate: (String, Date, Date) -> Unit, onDism
     }
 }
 
-/** O seletor devolve meia-noite em UTC; converte para o mesmo dia no fuso local. */
 private fun utcDayToLocal(utcMillis: Long, endOfDay: Boolean): Date {
     val utc = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply { timeInMillis = utcMillis }
     return Calendar.getInstance().apply {

@@ -15,14 +15,8 @@ data class ResponsibleRotationInfo(
 
 object TerritoryRotationHelper {
 
-    /** Quantidade de territórios ativos por dirigente acima da qual o app avisa ao designar. */
     const val MAX_ACTIVE_PER_RESPONSIBLE = 3
 
-    /**
-     * Calcula o histórico de cada dirigente neste território e ordena os candidatos:
-     * primeiro quem nunca trabalhou aqui, depois quem está com menos territórios
-     * e quem foi designado há mais tempo. O primeiro dentro do limite é o recomendado.
-     */
     fun computeRotationInfo(
         responsibles: List<User>,
         territory: Territory?,

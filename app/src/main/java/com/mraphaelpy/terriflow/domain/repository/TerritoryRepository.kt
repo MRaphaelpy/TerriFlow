@@ -8,7 +8,6 @@ interface TerritoryRepository {
     fun observeAll(): Flow<List<Territory>>
     fun observeById(id: String): Flow<Territory?>
 
-
     suspend fun getById(id: String): Territory?
     suspend fun getByCode(code: String): Territory?
 

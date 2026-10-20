@@ -3,7 +3,6 @@ package com.mraphaelpy.terriflow.domain.model
 import java.util.Calendar
 import java.util.Date
 
-/** Ano de serviço: de 1º de setembro a 31 de agosto do ano seguinte. */
 data class ServiceYear(val startYear: Int) {
 
     val start: Date get() = firstOfSeptember(startYear)
