@@ -1,6 +1,7 @@
 package com.mraphaelpy.terriflow.presentation.settings
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -24,10 +25,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.BrightnessAuto
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Edit
@@ -152,6 +155,7 @@ fun SettingsScreen(
                 isChecking = uiState.isCheckingUpdate,
                 onCheck = viewModel::checkForUpdates
             )
+            AuthorCard()
         }
     }
 
@@ -383,6 +387,34 @@ private fun UpdateCard(version: String, message: String?, isChecking: Boolean, o
                 Spacer(Modifier.width(8.dp))
                 Text("Verificar atualizações")
             }
+        }
+    }
+}
+
+private const val AUTHOR_NAME = "Marcos Rafael"
+private const val AUTHOR_GITHUB_USER = "MRaphaelpy"
+private const val AUTHOR_GITHUB_URL = "https://github.com/$AUTHOR_GITHUB_USER"
+
+@Composable
+private fun AuthorCard() {
+    val context = LocalContext.current
+    Surface(
+        onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(AUTHOR_GITHUB_URL))) },
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.surfaceContainer
+    ) {
+        Row(
+            modifier = Modifier.padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Icon(Icons.Default.Code, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Desenvolvido por $AUTHOR_NAME", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("github.com/$AUTHOR_GITHUB_USER", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.primary)
+            }
+            Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "Abrir no GitHub", tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
