@@ -9,6 +9,7 @@ import com.mraphaelpy.terriflow.domain.model.TerritoryStatus
 import com.mraphaelpy.terriflow.domain.repository.AuthRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
 import com.mraphaelpy.terriflow.presentation.components.TerritoryFilter
+import com.mraphaelpy.terriflow.presentation.components.TerritoryStatusDisplayOrder
 import com.mraphaelpy.terriflow.presentation.components.territoryPalette
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -76,19 +77,9 @@ class TerritoryListViewModel @Inject constructor(
     }
 
     companion object {
-        val SECTION_ORDER = listOf(
-            TerritoryStatus.IN_PROGRESS,
-            TerritoryStatus.ASSIGNED,
-            TerritoryStatus.PAUSED,
-            TerritoryStatus.RETURNED,
-            TerritoryStatus.AVAILABLE,
-            TerritoryStatus.COMPLETED,
-            TerritoryStatus.ARCHIVED
-        )
-
         fun groupByStatus(territories: List<Territory>): List<TerritorySection> {
             val byStatus = territories.groupBy { it.status }
-            return SECTION_ORDER.mapNotNull { status ->
+            return TerritoryStatusDisplayOrder.mapNotNull { status ->
                 byStatus[status]
                     ?.sortedWith(compareBy({ TerritoryCode.numberOf(it.code) ?: Int.MAX_VALUE }, { it.code }))
                     ?.let { TerritorySection(status, it) }

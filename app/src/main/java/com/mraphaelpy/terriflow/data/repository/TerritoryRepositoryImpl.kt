@@ -10,7 +10,6 @@ import com.mraphaelpy.terriflow.data.sync.TerritoryRemoteMerger
 import com.mraphaelpy.terriflow.di.ApplicationScope
 import com.mraphaelpy.terriflow.domain.model.Territory
 import com.mraphaelpy.terriflow.domain.model.TerritoryCode
-import com.mraphaelpy.terriflow.domain.model.TerritoryStatus
 import com.mraphaelpy.terriflow.domain.model.User
 import com.mraphaelpy.terriflow.domain.repository.CongregationRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
@@ -39,12 +38,6 @@ class TerritoryRepositoryImpl @Inject constructor(
 
     override fun observeById(id: String): Flow<Territory?> =
         territoryDao.observeById(id).map { it?.toDomain() }
-
-    override fun observeByStatus(status: TerritoryStatus): Flow<List<Territory>> =
-        territoryDao.observeByStatus(status.name).map { list -> list.map { it.toDomain() } }
-
-    override fun countByStatus(status: TerritoryStatus): Flow<Int> =
-        territoryDao.countByStatus(status.name)
 
     override suspend fun getById(id: String): Territory? {
         territoryDao.getById(id)?.let { return it.toDomain() }

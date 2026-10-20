@@ -79,9 +79,9 @@ import com.mraphaelpy.terriflow.domain.model.label
 import com.mraphaelpy.terriflow.presentation.components.ConfirmDialog
 import com.mraphaelpy.terriflow.presentation.components.DestructiveDialog
 import com.mraphaelpy.terriflow.presentation.components.FullScreenLoading
+import com.mraphaelpy.terriflow.presentation.components.TerritoryShapeBadge
 import com.mraphaelpy.terriflow.presentation.components.UserAvatarByName
 import com.mraphaelpy.terriflow.presentation.components.statusColor
-import com.mraphaelpy.terriflow.presentation.map.markerLabel
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -288,20 +288,7 @@ private fun HeroCard(territory: Territory, color: Color, isMine: Boolean) {
     ) {
         Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Box(
-                    modifier = Modifier
-                        .size(72.dp)
-                        .background(color, MaterialShapes.Cookie9Sided.toShape()),
-                    contentAlignment = Alignment.Center
-                ) {
-                    val label = markerLabel(territory.code)
-                    Text(
-                        label,
-                        style = if (label.length <= 2) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
+                TerritoryShapeBadge(code = territory.code, color = color, size = 72.dp)
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Surface(shape = CircleShape, color = statusTint.copy(alpha = 0.18f)) {
                         Row(

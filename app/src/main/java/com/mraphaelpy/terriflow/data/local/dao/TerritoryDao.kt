@@ -23,9 +23,6 @@ interface TerritoryDao {
     @Query("SELECT * FROM territories WHERE code = :code AND deletedAt IS NULL LIMIT 1")
     suspend fun getByCode(code: String): TerritoryEntity?
 
-    @Query("SELECT * FROM territories WHERE status = :status AND deletedAt IS NULL ORDER BY code ASC")
-    fun observeByStatus(status: String): Flow<List<TerritoryEntity>>
-
     @Query("SELECT * FROM territories WHERE synced = 0 AND deletedAt IS NULL")
     suspend fun getPending(): List<TerritoryEntity>
 
@@ -54,9 +51,6 @@ interface TerritoryDao {
 
     @Query("UPDATE territories SET synced = 1, syncVersion = :version WHERE id = :id AND updatedAt = :updatedAt")
     suspend fun markSyncedIfUnchanged(id: String, version: Long, updatedAt: Date)
-
-    @Query("SELECT COUNT(*) FROM territories WHERE status = :status AND deletedAt IS NULL")
-    fun countByStatus(status: String): Flow<Int>
 
     @Query("SELECT code FROM territories WHERE deletedAt IS NULL")
     suspend fun getAllCodes(): List<String>

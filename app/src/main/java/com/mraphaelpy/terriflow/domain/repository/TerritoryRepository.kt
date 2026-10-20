@@ -1,16 +1,13 @@
 package com.mraphaelpy.terriflow.domain.repository
 
 import com.mraphaelpy.terriflow.domain.model.Territory
-import com.mraphaelpy.terriflow.domain.model.TerritoryStatus
 import com.mraphaelpy.terriflow.domain.model.User
 import kotlinx.coroutines.flow.Flow
 
 interface TerritoryRepository {
     fun observeAll(): Flow<List<Territory>>
     fun observeById(id: String): Flow<Territory?>
-    fun observeByStatus(status: TerritoryStatus): Flow<List<Territory>>
 
-    fun countByStatus(status: TerritoryStatus): Flow<Int>
 
     suspend fun getById(id: String): Territory?
     suspend fun getByCode(code: String): Territory?

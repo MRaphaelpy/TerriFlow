@@ -1,6 +1,7 @@
 package com.mraphaelpy.terriflow.presentation.dashboard
 
 import android.net.Uri
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mraphaelpy.terriflow.core.image.ProfilePhotoEncoder
@@ -16,6 +17,7 @@ import com.mraphaelpy.terriflow.domain.repository.UserRepository
 import com.mraphaelpy.terriflow.domain.usecase.user.RenameUserUseCase
 import com.mraphaelpy.terriflow.domain.usecase.user.SyncResponsibleProfilesUseCase
 import com.mraphaelpy.terriflow.domain.usecase.user.UpdateProfilePhotoUseCase
+import com.mraphaelpy.terriflow.presentation.components.territoryPalette
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,23 +34,22 @@ import java.util.Date
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
-data class DashboardStats(
-    val available: Int = 0,
-    val assigned: Int = 0,
-    val inProgress: Int = 0,
-    val paused: Int = 0,
-    val completed: Int = 0
-)
+data class RecentActivity(val event: TerritoryEvent, val territory: Territory?)
 
 data class DashboardUiState(
     val currentUser: User? = null,
-    val stats: DashboardStats = DashboardStats(),
-    val recentEvents: List<TerritoryEvent> = emptyList(),
+    val totalTerritories: Int = 0,
+    val statusCounts: Map<TerritoryStatus, Int> = emptyMap(),
+    val myTerritories: List<Territory> = emptyList(),
+    val recentActivity: List<RecentActivity> = emptyList(),
     val overdueTerritories: List<Territory> = emptyList(),
+    val palette: Map<String, Color> = emptyMap(),
     val unreadCount: Int = 0,
     val isLoggingOut: Boolean = false,
     val isRefreshing: Boolean = false
-)
+) {
+    val isAdmin: Boolean get() = currentUser?.isAdmin == true
+}
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -117,34 +118,40 @@ class DashboardViewModel @Inject constructor(
             .launchIn(viewModelScope)
 
         combine(
-            territoryRepository.countByStatus(TerritoryStatus.AVAILABLE),
-            territoryRepository.countByStatus(TerritoryStatus.ASSIGNED),
-            territoryRepository.countByStatus(TerritoryStatus.IN_PROGRESS),
-            territoryRepository.countByStatus(TerritoryStatus.PAUSED),
-            territoryRepository.countByStatus(TerritoryStatus.COMPLETED),
-            ::DashboardStats
-        ).onEach { stats -> _uiState.update { it.copy(stats = stats) } }
-            .launchIn(viewModelScope)
-
-        eventRepository.observeRecent(RECENT_EVENTS_LIMIT)
-            .onEach { events -> _uiState.update { it.copy(recentEvents = events) } }
-            .launchIn(viewModelScope)
-
-        territoryRepository.observeByStatus(TerritoryStatus.IN_PROGRESS)
-            .onEach { inProgress -> _uiState.update { it.copy(overdueTerritories = overdue(inProgress)) } }
-            .launchIn(viewModelScope)
+            territoryRepository.observeAll(),
+            eventRepository.observeRecent(RECENT_EVENTS_LIMIT),
+            authRepository.observeCurrentUser()
+        ) { territories, events, user ->
+            val byId = territories.associateBy { it.id }
+            _uiState.update {
+                it.copy(
+                    totalTerritories = territories.size,
+                    statusCounts = territories.groupingBy { territory -> territory.status }.eachCount(),
+                    myTerritories = territories
+                        .filter { territory -> user != null && territory.currentResponsibleId == user.id }
+                        .sortedBy { territory -> MY_TERRITORY_ORDER.indexOf(territory.status) },
+                    recentActivity = events.map { event -> RecentActivity(event, byId[event.territoryId]) },
+                    overdueTerritories = overdue(territories),
+                    palette = territoryPalette(territories)
+                )
+            }
+        }.launchIn(viewModelScope)
     }
 
-    private fun overdue(inProgress: List<Territory>): List<Territory> {
+    private fun overdue(territories: List<Territory>): List<Territory> {
         val now = Date().time
-        return inProgress.filter { territory ->
+        return territories.filter { territory ->
+            if (territory.status != TerritoryStatus.IN_PROGRESS) return@filter false
             val since = territory.startedAt?.time ?: territory.assignedAt?.time ?: return@filter false
             TimeUnit.MILLISECONDS.toDays(now - since) > OVERDUE_DAYS
         }
     }
 
     private companion object {
-        const val RECENT_EVENTS_LIMIT = 20
+        const val RECENT_EVENTS_LIMIT = 8
+        val MY_TERRITORY_ORDER = listOf(
+            TerritoryStatus.IN_PROGRESS, TerritoryStatus.PAUSED, TerritoryStatus.ASSIGNED, TerritoryStatus.COMPLETED
+        )
         const val OVERDUE_DAYS = 90
     }
 }

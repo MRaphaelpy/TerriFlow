@@ -66,9 +66,9 @@ import com.mraphaelpy.terriflow.domain.model.label
 import com.mraphaelpy.terriflow.presentation.components.FullScreenLoading
 import com.mraphaelpy.terriflow.presentation.components.PillSearchField
 import com.mraphaelpy.terriflow.presentation.components.TerritoryFilterChips
+import com.mraphaelpy.terriflow.presentation.components.TerritoryShapeBadge
 import com.mraphaelpy.terriflow.presentation.components.UserAvatarByName
 import com.mraphaelpy.terriflow.presentation.components.statusColor
-import com.mraphaelpy.terriflow.presentation.map.markerLabel
 
 private val BottomNavClearance = 112.dp
 private val FabBottomOffset = 32.dp
@@ -290,7 +290,7 @@ private fun TerritoryListItem(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            TerritoryBadge(label = markerLabel(territory.code), color = color)
+            TerritoryShapeBadge(code = territory.code, color = color)
 
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -374,25 +374,6 @@ private fun ResponsibleLine(territory: Territory) {
                 color = MaterialTheme.colorScheme.outline
             )
         }
-    }
-}
-
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun TerritoryBadge(label: String, color: Color) {
-    Box(
-        modifier = Modifier
-            .size(52.dp)
-            .background(color, MaterialShapes.Cookie9Sided.toShape()),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            label,
-            style = if (label.length <= 2) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            color = Color.White,
-            maxLines = 1
-        )
     }
 }
 
