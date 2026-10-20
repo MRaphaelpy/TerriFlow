@@ -12,6 +12,7 @@ import com.mraphaelpy.terriflow.domain.repository.NotificationRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryEventRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
 import com.mraphaelpy.terriflow.domain.repository.UserRepository
+import com.mraphaelpy.terriflow.domain.usecase.notification.NotifyAdminsAndOwnerUseCase
 import java.util.Date
 import javax.inject.Inject
 
@@ -24,7 +25,8 @@ class CompleteTerritoryUseCase @Inject constructor(
     private val territoryRepository: TerritoryRepository,
     private val eventRepository: TerritoryEventRepository,
     private val notificationRepository: NotificationRepository,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val notifyAdminsAndOwner: NotifyAdminsAndOwnerUseCase
 ) {
     suspend operator fun invoke(territoryId: String, nextResponsibleId: String? = null) {
         val (actor, territory) = guard.authorize(territoryId, TerritoryAction.COMPLETE)
@@ -41,6 +43,17 @@ class CompleteTerritoryUseCase @Inject constructor(
             TerritoryEvent.create(territory.id, actor, EventType.COMPLETED, now)
         )
 
+        // Finalização (com ou sem transferência) é avisada aos admins e ao responsável
+        notifyAdminsAndOwner(
+            territory = territory,
+            ownerId = territory.currentResponsibleId,
+            actor = actor,
+            title = "Território finalizado",
+            body = "${territory.displayName} foi finalizado por ${actor.name}",
+            type = NotificationType.TERRITORY_COMPLETED,
+            createdAt = now
+        )
+
         if (nextResponsible == null) {
             territoryRepository.save(
                 territory.copy(
@@ -48,16 +61,6 @@ class CompleteTerritoryUseCase @Inject constructor(
                     pastResponsibleIds = pastResponsibleIds,
                     completedAt = now,
                     updatedAt = now
-                )
-            )
-            notificationRepository.save(
-                AppNotification.aboutTerritory(
-                    territory = territory,
-                    recipientId = AppNotification.BROADCAST,
-                    title = "Território finalizado",
-                    body = "${territory.displayName} foi finalizado por ${actor.name}",
-                    type = NotificationType.TERRITORY_COMPLETED,
-                    createdAt = now
                 )
             )
             return

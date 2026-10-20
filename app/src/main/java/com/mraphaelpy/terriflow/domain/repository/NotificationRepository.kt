@@ -4,10 +4,10 @@ import com.mraphaelpy.terriflow.domain.model.AppNotification
 import kotlinx.coroutines.flow.Flow
 
 interface NotificationRepository {
-    /** Notificações do usuário mais as enviadas para toda a congregação. */
     fun observeByUser(userId: String): Flow<List<AppNotification>>
     fun countUnread(userId: String): Flow<Int>
     suspend fun exists(id: String): Boolean
+    /** Baixa as notificações do usuário logado. */
     suspend fun syncFromRemote()
 
     /** Salva localmente e envia para a congregação. */

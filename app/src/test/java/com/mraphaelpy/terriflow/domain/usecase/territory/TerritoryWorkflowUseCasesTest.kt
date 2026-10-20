@@ -1,6 +1,5 @@
 package com.mraphaelpy.terriflow.domain.usecase.territory
 
-import com.mraphaelpy.terriflow.domain.model.AppNotification
 import com.mraphaelpy.terriflow.domain.model.DomainException
 import com.mraphaelpy.terriflow.domain.model.EventType
 import com.mraphaelpy.terriflow.domain.model.Territory
@@ -12,6 +11,7 @@ import com.mraphaelpy.terriflow.domain.repository.NotificationRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryEventRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
 import com.mraphaelpy.terriflow.domain.repository.UserRepository
+import com.mraphaelpy.terriflow.domain.usecase.notification.NotifyAdminsAndOwnerUseCase
 import com.mraphaelpy.terriflow.testutil.Fixtures
 import com.mraphaelpy.terriflow.testutil.Fixtures.admin
 import com.mraphaelpy.terriflow.testutil.Fixtures.otherPublisher
@@ -36,6 +36,11 @@ class TerritoryWorkflowUseCasesTest {
     private val notificationRepository: NotificationRepository = mockk(relaxed = true)
     private val userRepository: UserRepository = mockk()
     private val guard = TerritoryActionGuard(authRepository, territoryRepository)
+    private val notifyAdminsAndOwner = NotifyAdminsAndOwnerUseCase(userRepository, notificationRepository)
+
+    init {
+        coEvery { userRepository.getActiveAdmins() } returns listOf(admin)
+    }
 
     private fun given(user: User?, territory: Territory) {
         coEvery { authRepository.getCurrentUser() } returns user
@@ -49,7 +54,7 @@ class TerritoryWorkflowUseCasesTest {
         val saved = slot<Territory>()
         coEvery { territoryRepository.save(capture(saved)) } answers { saved.captured }
 
-        ReturnTerritoryUseCase(guard, territoryRepository, eventRepository, notificationRepository)(territory.id)
+        ReturnTerritoryUseCase(guard, territoryRepository, eventRepository, notifyAdminsAndOwner)(territory.id)
 
         coVerifyOrder {
             eventRepository.save(match { it.type == EventType.RETURNED })
@@ -58,7 +63,23 @@ class TerritoryWorkflowUseCasesTest {
         assertEquals(TerritoryStatus.RETURNED, saved.captured.status)
         assertNull(saved.captured.currentResponsibleId)
         assertTrue(publisher.id in saved.captured.pastResponsibleIds)
-        coVerify { notificationRepository.save(match { it.userId == AppNotification.BROADCAST }) }
+        // Só o admin é avisado: o responsável foi quem devolveu
+        coVerify(exactly = 1) { notificationRepository.save(any()) }
+        coVerify { notificationRepository.save(match { it.userId == admin.id }) }
+    }
+
+    @Test
+    fun `finalizacao feita por admin avisa o responsavel e nao o proprio admin`() = runTest {
+        val territory = Fixtures.territory(TerritoryStatus.IN_PROGRESS, responsible = publisher)
+        given(admin, territory)
+        coEvery { territoryRepository.save(any()) } answers { firstArg() }
+
+        CompleteTerritoryUseCase(guard, territoryRepository, eventRepository, notificationRepository, userRepository, notifyAdminsAndOwner)(
+            territory.id
+        )
+
+        coVerify(exactly = 1) { notificationRepository.save(any()) }
+        coVerify { notificationRepository.save(match { it.userId == publisher.id && it.title == "Território finalizado" }) }
     }
 
     @Test
@@ -67,7 +88,7 @@ class TerritoryWorkflowUseCasesTest {
         given(publisher, territory)
 
         try {
-            ReturnTerritoryUseCase(guard, territoryRepository, eventRepository, notificationRepository)(territory.id)
+            ReturnTerritoryUseCase(guard, territoryRepository, eventRepository, notifyAdminsAndOwner)(territory.id)
             fail("Deveria lançar ActionNotAllowed")
         } catch (expected: DomainException.ActionNotAllowed) {
         }
@@ -86,7 +107,7 @@ class TerritoryWorkflowUseCasesTest {
         val events = mutableListOf<TerritoryEvent>()
         coEvery { eventRepository.save(capture(events)) } returns Unit
 
-        CompleteTerritoryUseCase(guard, territoryRepository, eventRepository, notificationRepository, userRepository)(
+        CompleteTerritoryUseCase(guard, territoryRepository, eventRepository, notificationRepository, userRepository, notifyAdminsAndOwner)(
             territory.id, nextResponsibleId = otherPublisher.id
         )
 
@@ -104,6 +125,7 @@ class TerritoryWorkflowUseCasesTest {
             territoryRepository.save(any())
         }
         coVerify { notificationRepository.save(match { it.userId == otherPublisher.id }) }
+        coVerify { notificationRepository.save(match { it.userId == admin.id && it.title == "Território finalizado" }) }
     }
 
     @Test

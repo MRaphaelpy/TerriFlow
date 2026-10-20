@@ -19,13 +19,16 @@ class FirestoreNotificationSource @Inject constructor(
     private fun notificationsCollection(congregationId: String) =
         firestore.collection("congregations").document(congregationId).collection("notifications")
 
-    /** Notificações destinadas ao usuário ou a toda a congregação, mais recentes primeiro. */
+    private fun recentForUser(congregationId: String, userId: String, limit: Long) =
+        notificationsCollection(congregationId)
+            .whereEqualTo("userId", userId)
+            .orderBy("createdAt", Query.Direction.DESCENDING)
+            .limit(limit)
+
+    /** Notificações destinadas ao usuário, mais recentes primeiro. */
     fun observeForUser(congregationId: String, userId: String, limit: Long = 50): Flow<List<AppNotification>> =
         callbackFlow {
-            val sub = notificationsCollection(congregationId)
-                .whereIn("userId", listOf(userId, AppNotification.BROADCAST))
-                .orderBy("createdAt", Query.Direction.DESCENDING)
-                .limit(limit)
+            val sub = recentForUser(congregationId, userId, limit)
                 .addSnapshotListener { snapshot, error ->
                     if (error != null) { close(error); return@addSnapshotListener }
                     trySend(snapshot?.documents?.mapNotNull(NotificationDto::fromDocument) ?: emptyList())
@@ -36,10 +39,8 @@ class FirestoreNotificationSource @Inject constructor(
     fun insert(congregationId: String, notification: AppNotification): Task<Void> =
         notificationsCollection(congregationId).document(notification.id).set(NotificationDto.toMap(notification))
 
-    suspend fun getRecent(congregationId: String, limit: Long = 100): List<AppNotification> =
-        notificationsCollection(congregationId)
-            .orderBy("createdAt", Query.Direction.DESCENDING)
-            .limit(limit)
+    suspend fun getRecentForUser(congregationId: String, userId: String, limit: Long = 100): List<AppNotification> =
+        recentForUser(congregationId, userId, limit)
             .get()
             .await()
             .documents

@@ -1,6 +1,7 @@
 package com.mraphaelpy.terriflow.data.repository
 
 import android.util.Log
+import com.google.firebase.auth.FirebaseAuth
 import com.mraphaelpy.terriflow.data.local.dao.NotificationDao
 import com.mraphaelpy.terriflow.data.local.entity.NotificationEntity
 import com.mraphaelpy.terriflow.data.remote.RemoteWriter
@@ -15,6 +16,7 @@ import javax.inject.Singleton
 
 @Singleton
 class NotificationRepositoryImpl @Inject constructor(
+    private val auth: FirebaseAuth,
     private val notificationDao: NotificationDao,
     private val remoteSource: FirestoreNotificationSource,
     private val remoteWriter: RemoteWriter,
@@ -31,10 +33,12 @@ class NotificationRepositoryImpl @Inject constructor(
         notificationDao.getById(id) != null
 
     override suspend fun syncFromRemote() {
+        val userId = auth.currentUser?.uid ?: return
         val congregationId = congregationRepository.getCurrentCongregationId() ?: return
         runCatching {
             // IGNORE preserva o estado de leitura das notificações já existentes
-            notificationDao.insertAll(remoteSource.getRecent(congregationId).map(NotificationEntity::fromDomain))
+            val notifications = remoteSource.getRecentForUser(congregationId, userId)
+            notificationDao.insertAll(notifications.map(NotificationEntity::fromDomain))
         }.onFailure {
             Log.e(TAG, "Erro ao sincronizar notificações", it)
         }

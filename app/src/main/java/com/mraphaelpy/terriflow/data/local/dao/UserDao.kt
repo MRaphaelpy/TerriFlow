@@ -22,6 +22,9 @@ interface UserDao {
     @Query("SELECT * FROM users WHERE active = 1 AND deletedAt IS NULL ORDER BY name ASC")
     fun observeResponsibles(): Flow<List<UserEntity>>
 
+    @Query("SELECT * FROM users WHERE active = 1 AND deletedAt IS NULL AND role IN ('ADMIN', 'SUPER_ADMIN')")
+    suspend fun getActiveAdmins(): List<UserEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(user: UserEntity)
 

@@ -10,10 +10,10 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface NotificationDao {
 
-    @Query("SELECT * FROM notifications WHERE userId = :userId OR userId = '' OR userId = 'ALL' ORDER BY createdAt DESC")
+    @Query("SELECT * FROM notifications WHERE userId = :userId ORDER BY createdAt DESC")
     fun observeByUser(userId: String): Flow<List<NotificationEntity>>
 
-    @Query("SELECT COUNT(*) FROM notifications WHERE read = 0 AND (userId = :userId OR userId = '' OR userId = 'ALL')")
+    @Query("SELECT COUNT(*) FROM notifications WHERE read = 0 AND userId = :userId")
     fun countUnreadByUser(userId: String): Flow<Int>
 
     @Query("SELECT * FROM notifications WHERE id = :id LIMIT 1")
@@ -28,7 +28,7 @@ interface NotificationDao {
     @Query("UPDATE notifications SET read = 1 WHERE id = :id")
     suspend fun markRead(id: String)
 
-    @Query("UPDATE notifications SET read = 1 WHERE userId = :userId OR userId = '' OR userId = 'ALL'")
+    @Query("UPDATE notifications SET read = 1 WHERE userId = :userId")
     suspend fun markAllReadByUser(userId: String)
 
     @Query("DELETE FROM notifications WHERE territoryId = :territoryId")

@@ -64,7 +64,7 @@ class RealtimeSyncManager @Inject constructor(
                 if (notificationDao.getById(notification.id) != null) return@forEach
                 notificationDao.insert(NotificationEntity.fromDomain(notification))
                 // O primeiro snapshot traz o histórico (ex.: após reinstalar): só exibe as novas
-                if (!isFirstSnapshot && !notification.isBroadcast && notification.userId == userId) {
+                if (!isFirstSnapshot) {
                     systemNotifier.show(notification.title, notification.body, notification.territoryId)
                 }
             }

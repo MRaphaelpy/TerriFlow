@@ -12,6 +12,7 @@ enum class NotificationType {
     GENERAL
 }
 
+/** Notificação destinada a um único usuário ([userId]). */
 data class AppNotification(
     val id: String = "",
     val userId: String = "",
@@ -23,13 +24,7 @@ data class AppNotification(
     val read: Boolean = false,
     val createdAt: Date = Date()
 ) {
-    val isBroadcast: Boolean get() = userId.isBlank() || userId == BROADCAST_ALL
-
     companion object {
-        /** Notificações com [userId] vazio são exibidas para todos da congregação. */
-        const val BROADCAST = ""
-        private const val BROADCAST_ALL = "ALL"
-
         fun aboutTerritory(
             territory: Territory,
             recipientId: String,

@@ -33,6 +33,9 @@ class UserRepositoryImpl @Inject constructor(
     override suspend fun getById(id: String): User? =
         userDao.getById(id)?.toDomain()
 
+    override suspend fun getActiveAdmins(): List<User> =
+        userDao.getActiveAdmins().map { it.toDomain() }
+
     /** Grava no servidor e no Room. Lança exceção se o servidor recusar (ex.: sem permissão). */
     override suspend fun save(user: User) {
         val congregationId = congregationRepository.getCurrentCongregationId()

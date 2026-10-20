@@ -129,12 +129,13 @@ service cloud.firestore {
 
       // ── Notificações ────────────────────────────────────────────────
       match /notifications/{notificationId} {
-        // Qualquer membro ativo da congregação lê as notificações
-        allow read: if isActiveUser(congId);
-        // Qualquer membro ativo cria (atribuição, devolução, transferência)
+        // Cada notificação tem um destinatário: só ele (ou um admin) pode lê-la
+        allow read: if isActiveUser(congId) &&
+          (resource.data.userId == request.auth.uid || isAdmin(congId));
+        // Qualquer membro ativo cria (atribuição, finalização, devolução, transferência)
         allow create: if isActiveUser(congId);
-        // Membros ativos podem marcar como lidas
-        allow update: if isActiveUser(congId);
+        // Apenas o destinatário atualiza a própria notificação
+        allow update: if isActiveUser(congId) && resource.data.userId == request.auth.uid;
         // Admin ou superadmin pode excluir
         allow delete: if isAdmin(congId);
       }
