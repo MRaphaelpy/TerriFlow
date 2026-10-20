@@ -1,6 +1,7 @@
 package com.mraphaelpy.terriflow.data.repository
 
 import android.util.Log
+import com.mraphaelpy.terriflow.data.local.dao.TerritoryDao
 import com.mraphaelpy.terriflow.data.local.dao.TerritoryEventDao
 import com.mraphaelpy.terriflow.data.local.dao.UserDao
 import com.mraphaelpy.terriflow.data.local.entity.TerritoryEventEntity
@@ -10,6 +11,9 @@ import com.mraphaelpy.terriflow.domain.model.TerritoryEvent
 import com.mraphaelpy.terriflow.domain.model.withCurrentNames
 import com.mraphaelpy.terriflow.domain.repository.CongregationRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryEventRepository
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import javax.inject.Inject
@@ -19,6 +23,7 @@ import javax.inject.Singleton
 class TerritoryEventRepositoryImpl @Inject constructor(
     private val eventDao: TerritoryEventDao,
     private val userDao: UserDao,
+    private val territoryDao: TerritoryDao,
     private val remoteSource: FirestoreEventSource,
     private val remoteWriter: RemoteWriter,
     private val congregationRepository: CongregationRepository
@@ -81,7 +86,16 @@ class TerritoryEventRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun syncAllFromRemote() {
+        coroutineScope {
+            territoryDao.getAllIds()
+                .chunked(PARALLEL_TERRITORY_SYNCS)
+                .forEach { chunk -> chunk.map { id -> async { syncFromRemote(id) } }.awaitAll() }
+        }
+    }
+
     private companion object {
+        const val PARALLEL_TERRITORY_SYNCS = 8
         const val TAG = "TerritoryEventRepository"
     }
 }

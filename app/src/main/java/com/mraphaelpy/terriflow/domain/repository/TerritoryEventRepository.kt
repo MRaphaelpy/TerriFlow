@@ -10,4 +10,5 @@ interface TerritoryEventRepository {
     suspend fun save(event: TerritoryEvent)
     suspend fun syncPendingToRemote()
     suspend fun syncFromRemote(territoryId: String)
+    suspend fun syncAllFromRemote()
 }

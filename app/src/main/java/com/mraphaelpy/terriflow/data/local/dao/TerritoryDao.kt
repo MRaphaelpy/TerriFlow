@@ -52,6 +52,9 @@ interface TerritoryDao {
     @Query("UPDATE territories SET synced = 1, syncVersion = :version WHERE id = :id AND updatedAt = :updatedAt")
     suspend fun markSyncedIfUnchanged(id: String, version: Long, updatedAt: Date)
 
+    @Query("SELECT id FROM territories WHERE deletedAt IS NULL")
+    suspend fun getAllIds(): List<String>
+
     @Query("SELECT code FROM territories WHERE deletedAt IS NULL")
     suspend fun getAllCodes(): List<String>
 
