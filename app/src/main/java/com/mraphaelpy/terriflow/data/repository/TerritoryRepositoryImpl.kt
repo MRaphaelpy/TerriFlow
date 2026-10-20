@@ -7,6 +7,9 @@ import com.mraphaelpy.terriflow.data.remote.RemoteWriter
 import com.mraphaelpy.terriflow.data.remote.source.FirestoreEventSource
 import com.mraphaelpy.terriflow.data.remote.source.FirestoreNoteSource
 import com.mraphaelpy.terriflow.data.remote.source.FirestoreTerritorySource
+import com.mraphaelpy.terriflow.data.sync.SyncPlan
+import com.mraphaelpy.terriflow.data.sync.SyncScope
+import com.mraphaelpy.terriflow.data.sync.SyncStateStore
 import com.mraphaelpy.terriflow.data.sync.TerritoryRemoteMerger
 import com.mraphaelpy.terriflow.di.ApplicationScope
 import com.mraphaelpy.terriflow.domain.model.Territory
@@ -32,6 +35,7 @@ class TerritoryRepositoryImpl @Inject constructor(
     private val remoteWriter: RemoteWriter,
     private val merger: TerritoryRemoteMerger,
     private val congregationRepository: CongregationRepository,
+    private val syncState: SyncStateStore,
     @ApplicationScope private val appScope: CoroutineScope
 ) : TerritoryRepository {
 
@@ -73,7 +77,14 @@ class TerritoryRepositoryImpl @Inject constructor(
 
     override suspend fun syncFromRemote() {
         val congregationId = congregationRepository.getCurrentCongregationId() ?: return
-        runCatching { merger.merge(remoteSource.getAll(congregationId), removeMissing = true) }
+        val startedAt = System.currentTimeMillis()
+        val plan = syncState.plan(SyncScope.TERRITORIES, congregationId)
+        runCatching {
+            when (plan) {
+                SyncPlan.Full -> merger.merge(remoteSource.getAll(congregationId), removeMissing = true)
+                is SyncPlan.Incremental -> merger.merge(remoteSource.getChangedSince(congregationId, plan.since), removeMissing = false)
+            }
+        }.onSuccess { syncState.markSynced(SyncScope.TERRITORIES, congregationId, plan, startedAt) }
             .onFailure { Log.e(TAG, "Erro ao sincronizar territórios", it) }
     }
 

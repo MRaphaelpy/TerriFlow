@@ -13,6 +13,7 @@ import com.mraphaelpy.terriflow.data.local.AppDatabase
 import com.mraphaelpy.terriflow.data.local.dao.UserDao
 import com.mraphaelpy.terriflow.data.local.entity.UserEntity
 import com.mraphaelpy.terriflow.data.remote.source.FirestoreUserSource
+import com.mraphaelpy.terriflow.data.sync.SyncStateStore
 import com.mraphaelpy.terriflow.domain.model.AuthException
 import com.mraphaelpy.terriflow.domain.model.User
 import com.mraphaelpy.terriflow.domain.model.UserRole
@@ -40,7 +41,8 @@ class AuthRepositoryImpl @Inject constructor(
     private val userDao: UserDao,
     private val remoteSource: FirestoreUserSource,
     private val congregationRepository: CongregationRepository,
-    private val appDatabase: AppDatabase
+    private val appDatabase: AppDatabase,
+    private val syncState: SyncStateStore
 ) : AuthRepository {
 
     override val currentUserId: String?
@@ -107,6 +109,7 @@ class AuthRepositoryImpl @Inject constructor(
             }
         }
         congregationRepository.clearCongregationId()
+        syncState.clear()
         runCatching { withContext(Dispatchers.IO) { appDatabase.clearAllTables() } }
         auth.signOut()
     }

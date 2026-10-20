@@ -1,5 +1,6 @@
 package com.mraphaelpy.terriflow.data.remote.source
 
+import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -7,6 +8,7 @@ import com.google.firebase.firestore.SetOptions
 import com.mraphaelpy.terriflow.data.remote.dto.UserDto
 import com.mraphaelpy.terriflow.domain.model.User
 import kotlinx.coroutines.tasks.await
+import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -22,6 +24,14 @@ class FirestoreUserSource @Inject constructor(
 
     suspend fun getAll(congregationId: String): List<UserDto> =
         congregationUsersCollection(congregationId).get().await().documents.mapNotNull(UserDto::fromDocument)
+
+    suspend fun getChangedSince(congregationId: String, since: Date): List<UserDto> =
+        congregationUsersCollection(congregationId)
+            .whereGreaterThan(SERVER_UPDATED_AT, Timestamp(since))
+            .get()
+            .await()
+            .documents
+            .mapNotNull(UserDto::fromDocument)
 
     suspend fun getById(congregationId: String, id: String): UserDto? =
         UserDto.fromDocument(congregationUsersCollection(congregationId).document(id).get().await())
@@ -42,7 +52,7 @@ class FirestoreUserSource @Inject constructor(
     suspend fun upsert(congregationId: String, user: User) {
         congregationUsersCollection(congregationId)
             .document(user.id)
-            .set(UserDto.fromDomain(user).toMap(), SetOptions.merge())
+            .set(UserDto.fromDomain(user).toMap() + (SERVER_UPDATED_AT to FieldValue.serverTimestamp()), SetOptions.merge())
             .await()
         if (auth.currentUser?.uid == user.id) {
             runCatching { saveGlobalPointer(user.id, congregationId) }

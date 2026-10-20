@@ -52,7 +52,7 @@ class SyncWorker @AssistedInject constructor(
         const val WORK_NAME_ONCE = "sync_worker_once"
 
         fun buildRequest(): PeriodicWorkRequest =
-            PeriodicWorkRequestBuilder<SyncWorker>(15, TimeUnit.MINUTES)
+            PeriodicWorkRequestBuilder<SyncWorker>(1, TimeUnit.HOURS)
                 .setConstraints(
                     Constraints.Builder()
                         .setRequiredNetworkType(NetworkType.CONNECTED)

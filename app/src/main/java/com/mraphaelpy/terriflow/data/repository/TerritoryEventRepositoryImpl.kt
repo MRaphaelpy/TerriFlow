@@ -6,7 +6,11 @@ import com.mraphaelpy.terriflow.data.local.dao.TerritoryEventDao
 import com.mraphaelpy.terriflow.data.local.dao.UserDao
 import com.mraphaelpy.terriflow.data.local.entity.TerritoryEventEntity
 import com.mraphaelpy.terriflow.data.remote.RemoteWriter
+import com.mraphaelpy.terriflow.data.remote.dto.TerritoryEventDto
 import com.mraphaelpy.terriflow.data.remote.source.FirestoreEventSource
+import com.mraphaelpy.terriflow.data.sync.SyncPlan
+import com.mraphaelpy.terriflow.data.sync.SyncScope
+import com.mraphaelpy.terriflow.data.sync.SyncStateStore
 import com.mraphaelpy.terriflow.domain.model.TerritoryEvent
 import com.mraphaelpy.terriflow.domain.model.withCurrentNames
 import com.mraphaelpy.terriflow.domain.repository.CongregationRepository
@@ -24,6 +28,7 @@ class TerritoryEventRepositoryImpl @Inject constructor(
     private val eventDao: TerritoryEventDao,
     private val userDao: UserDao,
     private val territoryDao: TerritoryDao,
+    private val syncState: SyncStateStore,
     private val remoteSource: FirestoreEventSource,
     private val remoteWriter: RemoteWriter,
     private val congregationRepository: CongregationRepository
@@ -76,22 +81,33 @@ class TerritoryEventRepositoryImpl @Inject constructor(
 
     override suspend fun syncFromRemote(territoryId: String) {
         val congregationId = congregationRepository.getCurrentCongregationId() ?: return
-        runCatching {
-            val entities = remoteSource.getByTerritory(congregationId, territoryId).map {
-                TerritoryEventEntity.fromDomain(it.toDomain(), synced = true)
-            }
-            eventDao.insertAll(entities)
-        }.onFailure {
-            Log.e(TAG, "Erro ao sincronizar eventos do território $territoryId", it)
-        }
+        runCatching { fetchTerritoryEvents(congregationId, territoryId) }
+            .onFailure { Log.e(TAG, "Erro ao sincronizar eventos do território $territoryId", it) }
     }
 
     override suspend fun syncAllFromRemote() {
-        coroutineScope {
-            territoryDao.getAllIds()
-                .chunked(PARALLEL_TERRITORY_SYNCS)
-                .forEach { chunk -> chunk.map { id -> async { syncFromRemote(id) } }.awaitAll() }
-        }
+        val congregationId = congregationRepository.getCurrentCongregationId() ?: return
+        val startedAt = System.currentTimeMillis()
+        val plan = syncState.plan(SyncScope.EVENTS, congregationId)
+        runCatching {
+            when (plan) {
+                SyncPlan.Full -> coroutineScope {
+                    territoryDao.getAllIds()
+                        .chunked(PARALLEL_TERRITORY_SYNCS)
+                        .forEach { chunk -> chunk.map { id -> async { fetchTerritoryEvents(congregationId, id) } }.awaitAll() }
+                }
+                is SyncPlan.Incremental -> insertRemote(remoteSource.getChangedSince(congregationId, plan.since))
+            }
+        }.onSuccess { syncState.markSynced(SyncScope.EVENTS, congregationId, plan, startedAt) }
+            .onFailure { Log.e(TAG, "Erro ao sincronizar eventos", it) }
+    }
+
+    private suspend fun fetchTerritoryEvents(congregationId: String, territoryId: String) {
+        insertRemote(remoteSource.getByTerritory(congregationId, territoryId))
+    }
+
+    private suspend fun insertRemote(events: List<TerritoryEventDto>) {
+        eventDao.insertAll(events.map { TerritoryEventEntity.fromDomain(it.toDomain(), synced = true) })
     }
 
     private companion object {

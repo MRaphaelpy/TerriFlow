@@ -1,6 +1,8 @@
 package com.mraphaelpy.terriflow.data.remote.source
 
 import com.google.android.gms.tasks.Task
+import com.google.firebase.Timestamp
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.mraphaelpy.terriflow.data.remote.dto.TerritoryEventDto
@@ -9,8 +11,11 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
+
+const val SERVER_CREATED_AT = "serverCreatedAt"
 
 @Singleton
 class FirestoreEventSource @Inject constructor(
@@ -36,7 +41,16 @@ class FirestoreEventSource @Inject constructor(
     fun insert(congregationId: String, event: TerritoryEvent): Task<Void> =
         eventsCollection(congregationId, event.territoryId)
             .document(event.id)
-            .set(TerritoryEventDto.fromDomain(event).toMap())
+            .set(TerritoryEventDto.fromDomain(event).toMap() + (SERVER_CREATED_AT to FieldValue.serverTimestamp()))
+
+    suspend fun getChangedSince(congregationId: String, since: Date): List<TerritoryEventDto> =
+        firestore.collectionGroup("events")
+            .whereEqualTo("congregationId", congregationId)
+            .whereGreaterThan(SERVER_CREATED_AT, Timestamp(since))
+            .get()
+            .await()
+            .documents
+            .mapNotNull(TerritoryEventDto::fromDocument)
 
     suspend fun getByTerritory(congregationId: String, territoryId: String): List<TerritoryEventDto> =
         eventsCollection(congregationId, territoryId)

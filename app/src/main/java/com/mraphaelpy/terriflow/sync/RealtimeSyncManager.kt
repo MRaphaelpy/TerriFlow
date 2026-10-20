@@ -48,8 +48,9 @@ class RealtimeSyncManager @Inject constructor(
     }
 
     private suspend fun syncTerritories(congregationId: String) {
-        territoryRemoteSource.observeAll(congregationId).collectSafely("territórios") { snapshot ->
+        territoryRemoteSource.observeChangedSince(congregationId, since = null).collectSafely("territórios") { snapshot ->
             territoryMerger.merge(snapshot.territories, removeMissing = !snapshot.isFromCache)
+            snapshot.removedIds.forEach { territoryMerger.removeLocally(it) }
         }
     }
 

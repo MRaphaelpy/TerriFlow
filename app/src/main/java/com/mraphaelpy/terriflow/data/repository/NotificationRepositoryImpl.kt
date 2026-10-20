@@ -6,6 +6,9 @@ import com.mraphaelpy.terriflow.data.local.dao.NotificationDao
 import com.mraphaelpy.terriflow.data.local.entity.NotificationEntity
 import com.mraphaelpy.terriflow.data.remote.RemoteWriter
 import com.mraphaelpy.terriflow.data.remote.source.FirestoreNotificationSource
+import com.mraphaelpy.terriflow.data.sync.SyncPlan
+import com.mraphaelpy.terriflow.data.sync.SyncScope
+import com.mraphaelpy.terriflow.data.sync.SyncStateStore
 import com.mraphaelpy.terriflow.domain.model.AppNotification
 import com.mraphaelpy.terriflow.domain.repository.CongregationRepository
 import com.mraphaelpy.terriflow.domain.repository.NotificationRepository
@@ -20,7 +23,8 @@ class NotificationRepositoryImpl @Inject constructor(
     private val notificationDao: NotificationDao,
     private val remoteSource: FirestoreNotificationSource,
     private val remoteWriter: RemoteWriter,
-    private val congregationRepository: CongregationRepository
+    private val congregationRepository: CongregationRepository,
+    private val syncState: SyncStateStore
 ) : NotificationRepository {
 
     override fun observeByUser(userId: String): Flow<List<AppNotification>> =
@@ -35,11 +39,18 @@ class NotificationRepositoryImpl @Inject constructor(
     override suspend fun syncFromRemote() {
         val userId = auth.currentUser?.uid ?: return
         val congregationId = congregationRepository.getCurrentCongregationId() ?: return
+        val startedAt = System.currentTimeMillis()
+        val plan = syncState.plan(SyncScope.NOTIFICATIONS, congregationId)
         runCatching {
-            val notifications = remoteSource.getRecentForUser(congregationId, userId)
+            val notifications = when (plan) {
+                SyncPlan.Full -> remoteSource.getRecentForUser(congregationId, userId)
+                is SyncPlan.Incremental -> remoteSource.getForUserSince(congregationId, userId, plan.since)
+            }
             notificationDao.insertAll(notifications.map(NotificationEntity::fromDomain))
             val readRemotely = notifications.filter { it.read }.map { it.id }
             if (readRemotely.isNotEmpty()) notificationDao.markReadIds(readRemotely)
+        }.onSuccess {
+            syncState.markSynced(SyncScope.NOTIFICATIONS, congregationId, plan, startedAt)
         }.onFailure {
             Log.e(TAG, "Erro ao sincronizar notificações", it)
         }
