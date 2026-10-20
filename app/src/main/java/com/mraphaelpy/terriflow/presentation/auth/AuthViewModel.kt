@@ -95,10 +95,21 @@ class AuthViewModel @Inject constructor(
         }
     }
 
+    fun onGoogleSignInFailed(statusCode: Int?) {
+        if (statusCode == GOOGLE_SIGN_IN_CANCELLED) return
+        _uiState.value = _uiState.value.copy(
+            error = "Não foi possível entrar com o Google" + (statusCode?.let { " (código $it)" } ?: "")
+        )
+    }
+
     fun clearError() { _uiState.value = _uiState.value.copy(error = null) }
 
     private fun friendlyError(e: Throwable): String = when (e) {
         is AuthException -> e.message.orEmpty()
         else -> AuthException.Unknown(e).message.orEmpty()
+    }
+
+    private companion object {
+        const val GOOGLE_SIGN_IN_CANCELLED = 12501
     }
 }
