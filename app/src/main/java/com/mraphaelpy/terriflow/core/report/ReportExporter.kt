@@ -1,5 +1,6 @@
 package com.mraphaelpy.terriflow.core.report
 
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
@@ -39,6 +40,7 @@ class ReportExporter @Inject constructor(
         val send = Intent(Intent.ACTION_SEND).apply {
             type = format.mimeType
             putExtra(Intent.EXTRA_STREAM, uri)
+            clipData = ClipData.newRawUri(file.name, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         return Intent.createChooser(send, "Compartilhar relatório").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
