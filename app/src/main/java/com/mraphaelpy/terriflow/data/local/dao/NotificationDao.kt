@@ -31,6 +31,12 @@ interface NotificationDao {
     @Query("UPDATE notifications SET read = 1 WHERE userId = :userId")
     suspend fun markAllReadByUser(userId: String)
 
+    @Query("UPDATE notifications SET read = 1 WHERE id IN (:ids)")
+    suspend fun markReadIds(ids: List<String>)
+
+    @Query("SELECT id FROM notifications WHERE read = 0 AND userId = :userId")
+    suspend fun getUnreadIds(userId: String): List<String>
+
     @Query("DELETE FROM notifications WHERE territoryId = :territoryId")
     suspend fun deleteByTerritory(territoryId: String)
 }

@@ -57,9 +57,13 @@ class RealtimeSyncManager @Inject constructor(
         var isFirstSnapshot = true
         notificationRemoteSource.observeForUser(congregationId, userId).collectSafely("notificações") { notifications ->
             notifications.forEach { notification ->
-                if (notificationDao.getById(notification.id) != null) return@forEach
+                val existing = notificationDao.getById(notification.id)
+                if (existing != null) {
+                    if (notification.read && !existing.read) notificationDao.markRead(notification.id)
+                    return@forEach
+                }
                 notificationDao.insert(NotificationEntity.fromDomain(notification))
-                if (!isFirstSnapshot) {
+                if (!isFirstSnapshot && !notification.read) {
                     systemNotifier.show(notification.title, notification.body, notification.territoryId)
                 }
             }

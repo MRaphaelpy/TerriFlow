@@ -38,6 +38,9 @@ class FirestoreNotificationSource @Inject constructor(
     fun insert(congregationId: String, notification: AppNotification): Task<Void> =
         notificationsCollection(congregationId).document(notification.id).set(NotificationDto.toMap(notification))
 
+    fun markRead(congregationId: String, id: String): Task<Void> =
+        notificationsCollection(congregationId).document(id).update("read", true)
+
     suspend fun getRecentForUser(congregationId: String, userId: String, limit: Long = 100): List<AppNotification> =
         recentForUser(congregationId, userId, limit)
             .get()

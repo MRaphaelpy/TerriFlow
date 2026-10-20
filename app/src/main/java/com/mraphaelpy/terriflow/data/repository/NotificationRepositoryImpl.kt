@@ -38,6 +38,8 @@ class NotificationRepositoryImpl @Inject constructor(
         runCatching {
             val notifications = remoteSource.getRecentForUser(congregationId, userId)
             notificationDao.insertAll(notifications.map(NotificationEntity::fromDomain))
+            val readRemotely = notifications.filter { it.read }.map { it.id }
+            if (readRemotely.isNotEmpty()) notificationDao.markReadIds(readRemotely)
         }.onFailure {
             Log.e(TAG, "Erro ao sincronizar notificações", it)
         }
@@ -55,10 +57,19 @@ class NotificationRepositoryImpl @Inject constructor(
 
     override suspend fun markRead(id: String) {
         notificationDao.markRead(id)
+        pushRead(listOf(id))
     }
 
     override suspend fun markAllRead(userId: String) {
+        val unread = notificationDao.getUnreadIds(userId)
         notificationDao.markAllReadByUser(userId)
+        pushRead(unread)
+    }
+
+    private suspend fun pushRead(ids: List<String>) {
+        if (ids.isEmpty()) return
+        val congregationId = congregationRepository.getCurrentCongregationId() ?: return
+        ids.forEach { id -> remoteWriter.write(TAG, { remoteSource.markRead(congregationId, id) }) }
     }
 
     private companion object {
