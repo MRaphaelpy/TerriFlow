@@ -45,4 +45,16 @@ class TerritoryGeometryTest {
         val b = Fixtures.territory().copy(id = "t2", latitude = -3.0, longitude = 7.0)
         assertEquals(GeoBounds(north = 2.0, east = 7.0, south = -3.0, west = 0.0), listOf(a, b).bounds())
     }
+
+    @Test
+    fun `centroide cai no centro de area de quadras irregulares`() {
+        assertEquals(LatLng(1.0, 1.0), polygonCentroid(square))
+        val lShape = listOf(
+            LatLng(0.0, 0.0), LatLng(0.0, 4.0), LatLng(1.0, 4.0),
+            LatLng(1.0, 1.0), LatLng(4.0, 1.0), LatLng(4.0, 0.0)
+        )
+        val center = polygonCentroid(lShape)!!
+        assertTrue(center.lat < 1.5 && center.lng < 1.5)
+        assertNull(polygonCentroid(emptyList()))
+    }
 }

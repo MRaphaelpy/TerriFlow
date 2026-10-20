@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.mraphaelpy.terriflow.core.report.MapImageSharer
 import com.mraphaelpy.terriflow.domain.model.label
+import com.mraphaelpy.terriflow.presentation.map.BlockLabelsOverlay
 import com.mraphaelpy.terriflow.presentation.map.openInGoogleMaps
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
@@ -143,6 +144,10 @@ internal fun TerritoryMiniMap(
                                     }
                                     mapView.overlays.add(0, poly)
                                 }
+                                mapView.overlays.add(
+                                    blockPolygons.size,
+                                    BlockLabelsOverlay(blockPolygons, context.resources.displayMetrics.density)
+                                )
                             } else if (hasBoundary) {
                                 val poly = Polygon().apply {
                                     val pts = boundaryPoints.map { GeoPoint(it.lat, it.lng) }.toMutableList()

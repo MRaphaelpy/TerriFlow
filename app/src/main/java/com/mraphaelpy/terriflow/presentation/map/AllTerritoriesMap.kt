@@ -85,7 +85,12 @@ class TerritoryMapState {
 
 private data class RenderKey(val territory: Territory, val color: Color, val highlighted: Boolean, val mine: Boolean)
 
-private class RenderedTerritory(val key: RenderKey, val polygons: List<Polygon>, val marker: Marker?)
+private class RenderedTerritory(
+    val key: RenderKey,
+    val polygons: List<Polygon>,
+    val blockLabels: BlockLabelsOverlay?,
+    val marker: Marker?
+)
 
 @Composable
 fun AllTerritoriesMap(
@@ -175,6 +180,7 @@ fun AllTerritoriesMap(
             val stale = rendered.filter { (id, item) -> desired[id] != item.key }
             stale.forEach { (id, item) ->
                 mapView.overlays.removeAll(item.polygons.toSet())
+                item.blockLabels?.let { mapView.overlays.remove(it) }
                 item.marker?.let { mapView.overlays.remove(it) }
                 rendered.remove(id)
             }
@@ -185,15 +191,24 @@ fun AllTerritoriesMap(
                 added = true
                 val polygons = buildPolygons(key) { currentOnClick(id) }
                 polygons.forEach { mapView.overlays.add(0, it) }
+                val blockLabels = key.territory.blockPolygons.takeIf { it.isNotEmpty() }?.let { blocks ->
+                    BlockLabelsOverlay(blocks, mapView.resources.displayMetrics.density, minZoom = BLOCK_LABELS_MIN_ZOOM)
+                }
+                blockLabels?.let { labels ->
+                    val belowMarkers = state.locationOverlay?.let { mapView.overlays.indexOf(it) }?.takeIf { it >= 0 } ?: mapView.overlays.size
+                    mapView.overlays.add(belowMarkers, labels)
+                }
                 val marker = buildMarker(mapView, key, iconCache) { currentOnClick(id) }
                 marker?.let { mapView.overlays.add(it) }
-                rendered[id] = RenderedTerritory(key, polygons, marker)
+                rendered[id] = RenderedTerritory(key, polygons, blockLabels, marker)
             }
 
             if (stale.isNotEmpty() || added) mapView.invalidate()
         }
     )
 }
+
+private const val BLOCK_LABELS_MIN_ZOOM = 16.0
 
 private fun buildPolygons(key: RenderKey, onClick: () -> Unit): List<Polygon> {
     val territory = key.territory

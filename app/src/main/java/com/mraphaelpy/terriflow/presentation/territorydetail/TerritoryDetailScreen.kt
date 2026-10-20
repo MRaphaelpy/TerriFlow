@@ -264,6 +264,17 @@ fun TerritoryDetailScreen(
 
             TerritoryInfoGroup(territory)
 
+            TerritoryMiniMap(
+                lat = territory.latitude,
+                lng = territory.longitude,
+                label = "${territory.code} — ${territory.name}",
+                color = color,
+                boundaryPoints = territory.boundaryPoints,
+                blockPolygons = territory.blockPolygons,
+                completedBlocks = territory.completedBlocks,
+                onViewMap = { onNavigateToMap(territory.id) }
+            )
+
             if (territory.hasBlocks) {
                 BlockProgressSection(
                     territory = territory,
@@ -281,17 +292,6 @@ fun TerritoryDetailScreen(
                     onDelete = viewModel::deleteNote
                 )
             }
-
-            TerritoryMiniMap(
-                lat = territory.latitude,
-                lng = territory.longitude,
-                label = "${territory.code} — ${territory.name}",
-                color = color,
-                boundaryPoints = territory.boundaryPoints,
-                blockPolygons = territory.blockPolygons,
-                completedBlocks = territory.completedBlocks,
-                onViewMap = { onNavigateToMap(territory.id) }
-            )
 
             if (uiState.isAdmin) {
                 RotationHistoryCard(
