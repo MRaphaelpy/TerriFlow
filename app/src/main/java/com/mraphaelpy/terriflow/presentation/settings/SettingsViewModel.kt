@@ -1,12 +1,9 @@
 package com.mraphaelpy.terriflow.presentation.settings
 
-import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
-import android.util.Base64
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mraphaelpy.terriflow.core.image.ProfilePhotoEncoder
 import com.mraphaelpy.terriflow.core.updater.AppUpdateInfo
 import com.mraphaelpy.terriflow.core.updater.AppUpdateManager
 import com.mraphaelpy.terriflow.domain.model.Congregation
@@ -17,14 +14,12 @@ import com.mraphaelpy.terriflow.domain.repository.CongregationRepository
 import com.mraphaelpy.terriflow.domain.repository.SettingsRepository
 import com.mraphaelpy.terriflow.domain.repository.ThemeMode
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 
 data class SettingsUiState(
@@ -43,28 +38,37 @@ class SettingsViewModel @Inject constructor(
     private val repository: SettingsRepository,
     private val congregationRepository: CongregationRepository,
     private val authRepository: AuthRepository,
+    private val photoEncoder: ProfilePhotoEncoder,
     val updateManager: AppUpdateManager
 ) : ViewModel() {
 
-    private val _congregationState = MutableStateFlow<Pair<Congregation?, Boolean>>(null to true)
-    private val _updateState = MutableStateFlow<Triple<Boolean, AppUpdateInfo?, String?>>(Triple(false, null, null))
+    private data class CongregationState(val congregation: Congregation? = null, val isLoading: Boolean = true)
+
+    private data class UpdateCheckState(
+        val isChecking: Boolean = false,
+        val availableUpdate: AppUpdateInfo? = null,
+        val message: String? = null
+    )
+
+    private val congregationState = MutableStateFlow(CongregationState())
+    private val updateState = MutableStateFlow(UpdateCheckState())
 
     val uiState = combine(
         authRepository.observeCurrentUser(),
         repository.themeMode,
         repository.appColor,
-        _congregationState,
-        _updateState
-    ) { user, mode, color, (congregation, loading), (isChecking, updateInfo, message) ->
+        congregationState,
+        updateState
+    ) { user, mode, color, congregation, update ->
         SettingsUiState(
             currentUser = user,
             themeMode = mode,
             appColor = color,
-            congregation = congregation,
-            congregationLoading = loading,
-            isCheckingUpdate = isChecking,
-            availableUpdate = updateInfo,
-            updateMessage = message
+            congregation = congregation.congregation,
+            congregationLoading = congregation.isLoading,
+            isCheckingUpdate = update.isChecking,
+            availableUpdate = update.availableUpdate,
+            updateMessage = update.message
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsUiState())
 
@@ -74,9 +78,11 @@ class SettingsViewModel @Inject constructor(
 
     private fun loadCongregation() {
         viewModelScope.launch {
-            val id = congregationRepository.getCurrentCongregationId()
-            val congregation = if (id != null) congregationRepository.getById(id) else null
-            _congregationState.update { congregation to false }
+            // Sem conexão a consulta pode falhar; a tela apenas fica sem os dados da congregação
+            val congregation = runCatching {
+                congregationRepository.getCurrentCongregationId()?.let { congregationRepository.getById(it) }
+            }.getOrNull()
+            congregationState.value = CongregationState(congregation, isLoading = false)
         }
     }
 
@@ -84,57 +90,36 @@ class SettingsViewModel @Inject constructor(
         val trimmed = newName.trim()
         if (trimmed.isBlank()) return
         viewModelScope.launch {
-            authRepository.updateName(trimmed)
+            runCatching { authRepository.updateName(trimmed) }
         }
     }
 
-    fun updateProfilePicture(uri: Uri, context: Context) {
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val inputStream = context.contentResolver.openInputStream(uri)
-                val bitmap = BitmapFactory.decodeStream(inputStream)
-                inputStream?.close()
-                if (bitmap != null) {
-                    val maxSize = 300
-                    val ratio = bitmap.width.toFloat() / bitmap.height.toFloat()
-                    val width = if (ratio > 1) maxSize else (maxSize * ratio).toInt()
-                    val height = if (ratio > 1) (maxSize / ratio).toInt() else maxSize
-                    val scaled = Bitmap.createScaledBitmap(bitmap, width, height, true)
-
-                    val outputStream = ByteArrayOutputStream()
-                    scaled.compress(Bitmap.CompressFormat.JPEG, 70, outputStream)
-                    val byteArray = outputStream.toByteArray()
-                    val base64 = Base64.encodeToString(byteArray, Base64.NO_WRAP)
-
-                    val dataUri = "data:image/jpeg;base64,$base64"
-                    authRepository.updatePhotoUrl(dataUri)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
+    fun updateProfilePicture(uri: Uri) {
+        viewModelScope.launch {
+            runCatching {
+                photoEncoder.encode(uri)?.let { authRepository.updatePhotoUrl(it) }
             }
         }
     }
 
     fun checkForUpdates() {
         viewModelScope.launch {
-            _updateState.update { Triple(true, null, null) }
+            updateState.value = UpdateCheckState(isChecking = true)
             val info = updateManager.checkForUpdate()
-            if (info != null && info.hasUpdate) {
-                _updateState.update { Triple(false, info, null) }
-            } else if (info != null) {
-                _updateState.update { Triple(false, null, "O aplicativo já está na versão mais recente (v${info.currentVersion})") }
-            } else {
-                _updateState.update { Triple(false, null, "Não foi possível verificar atualizações. Verifique sua conexão.") }
+            updateState.value = when {
+                info == null -> UpdateCheckState(message = "Não foi possível verificar atualizações. Verifique sua conexão.")
+                info.hasUpdate -> UpdateCheckState(availableUpdate = info)
+                else -> UpdateCheckState(message = "O aplicativo já está na versão mais recente (v${info.currentVersion})")
             }
         }
     }
 
     fun dismissUpdateDialog() {
-        _updateState.update { it.copy(second = null) }
+        updateState.update { it.copy(availableUpdate = null) }
     }
 
     fun clearUpdateMessage() {
-        _updateState.update { it.copy(third = null) }
+        updateState.update { it.copy(message = null) }
     }
 
     fun updateThemeMode(mode: ThemeMode) {

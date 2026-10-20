@@ -2,8 +2,8 @@ package com.mraphaelpy.terriflow.presentation.auth
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mraphaelpy.terriflow.domain.model.AuthException
 import com.mraphaelpy.terriflow.domain.repository.AuthRepository
-import com.mraphaelpy.terriflow.domain.repository.CongregationRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,8 +21,7 @@ data class AuthUiState(
 
 @HiltViewModel
 class AuthViewModel @Inject constructor(
-    private val authRepository: AuthRepository,
-    private val congregationRepository: CongregationRepository
+    private val authRepository: AuthRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AuthUiState(isLoggedIn = authRepository.isLoggedIn))
@@ -99,11 +98,8 @@ class AuthViewModel @Inject constructor(
 
     fun clearError() { _uiState.value = _uiState.value.copy(error = null) }
 
-    private fun friendlyError(e: Throwable): String = when {
-        e.message?.contains("password") == true -> "Senha incorreta"
-        e.message?.contains("no user") == true -> "Usuário não encontrado"
-        e.message?.contains("email") == true -> "E-mail inválido ou já em uso"
-        e.message?.contains("network") == true -> "Sem conexão com a internet"
-        else -> "Erro: ${e.message}"
+    private fun friendlyError(e: Throwable): String = when (e) {
+        is AuthException -> e.message.orEmpty()
+        else -> AuthException.Unknown(e).message.orEmpty()
     }
 }

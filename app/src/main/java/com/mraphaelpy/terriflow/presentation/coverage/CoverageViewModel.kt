@@ -2,18 +2,16 @@ package com.mraphaelpy.terriflow.presentation.coverage
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mraphaelpy.terriflow.domain.model.EventType
 import com.mraphaelpy.terriflow.domain.model.Territory
 import com.mraphaelpy.terriflow.domain.model.TerritoryEvent
 import com.mraphaelpy.terriflow.domain.repository.TerritoryEventRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.stateIn
 import java.util.Date
 import javax.inject.Inject
 
@@ -39,69 +37,29 @@ data class CoverageUiState(
 
 @HiltViewModel
 class CoverageViewModel @Inject constructor(
-    private val territoryRepository: TerritoryRepository,
-    private val eventRepository: TerritoryEventRepository
+    territoryRepository: TerritoryRepository,
+    eventRepository: TerritoryEventRepository
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(CoverageUiState())
-    val uiState: StateFlow<CoverageUiState> = _uiState.asStateFlow()
+    private val sortOption = MutableStateFlow(CoverageSortOption.OLDEST_COMPLETED_FIRST)
 
-    init {
-        loadData()
-    }
+    private val allCoverages = combine(
+        territoryRepository.observeAll(),
+        eventRepository.observeAll(),
+        CoverageCalculator::compute
+    )
 
-    private fun loadData() {
-        viewModelScope.launch {
-            combine(
-                territoryRepository.observeAll(),
-                eventRepository.observeAll()
-            ) { territories, events ->
-                
-                val eventsByTerritory = events.groupBy { it.territoryId }
-                
-                val coverages = territories.map { territory ->
-                    val tEvents = eventsByTerritory[territory.id]?.sortedByDescending { it.timestamp } ?: emptyList()
-                    val completedEvents = tEvents.filter { it.type == EventType.COMPLETED }
-                    
-                    val completionCount = completedEvents.size
-                    val lastCompletedDate = completedEvents.firstOrNull()?.timestamp ?: territory.completedAt
-                    
-                    TerritoryCoverage(
-                        territory = territory,
-                        lastCompletedDate = lastCompletedDate,
-                        completionCount = completionCount,
-                        historyPreview = tEvents.take(3)
-                    )
-                }
-                
-                coverages
-            }.collect { unsorted ->
-                _uiState.update { it.copy(isLoading = false) }
-                applySort(unsorted, _uiState.value.sortOption)
-            }
-        }
-    }
+    // A ordenação é sempre aplicada sobre a lista completa; antes ela era aplicada
+    // sobre o resultado do filtro anterior e "Nunca trabalhados" fazia territórios sumirem.
+    val uiState: StateFlow<CoverageUiState> = combine(allCoverages, sortOption) { coverages, option ->
+        CoverageUiState(
+            coverages = CoverageCalculator.sort(coverages, option),
+            sortOption = option,
+            isLoading = false
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), CoverageUiState())
 
     fun setSortOption(option: CoverageSortOption) {
-        _uiState.update { it.copy(sortOption = option) }
-        applySort(_uiState.value.coverages, option)
-    }
-
-    private fun applySort(list: List<TerritoryCoverage>, option: CoverageSortOption) {
-        val sorted = when (option) {
-            CoverageSortOption.NEVER_WORKED -> {
-                list.filter { it.lastCompletedDate == null }
-            }
-            CoverageSortOption.OLDEST_COMPLETED_FIRST -> {
-                list.sortedWith(compareBy(nullsFirst()) { it.lastCompletedDate })
-            }
-            CoverageSortOption.NEWEST_COMPLETED_FIRST -> {
-                list.sortedWith(compareByDescending(nullsLast()) { it.lastCompletedDate })
-            }
-            CoverageSortOption.MOST_WORKED -> {
-                list.sortedByDescending { it.completionCount }
-            }
-        }
-        _uiState.update { it.copy(coverages = sorted) }
+        sortOption.value = option
     }
 }

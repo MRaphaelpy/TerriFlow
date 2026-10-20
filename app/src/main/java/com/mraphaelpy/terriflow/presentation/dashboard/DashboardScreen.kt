@@ -89,12 +89,11 @@ fun DashboardScreen(
     var showLogoutDialog by remember { mutableStateOf(false) }
     var showEditNameDialog by remember { mutableStateOf(false) }
     
-    val context = androidx.compose.ui.platform.LocalContext.current
     val photoPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         if (uri != null) {
-            viewModel.updateProfilePicture(uri, context)
+            viewModel.updateProfilePicture(uri)
         }
     }
 
