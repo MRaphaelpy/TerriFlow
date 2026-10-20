@@ -1,254 +1,267 @@
 package com.mraphaelpy.terriflow.presentation.map
 
-import android.content.Context
+import android.graphics.drawable.Drawable
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.mraphaelpy.terriflow.domain.model.GeoBounds
+import com.mraphaelpy.terriflow.domain.model.LatLng
 import com.mraphaelpy.terriflow.domain.model.Territory
+import com.mraphaelpy.terriflow.domain.model.bounds
+import com.mraphaelpy.terriflow.domain.model.center
+import com.mraphaelpy.terriflow.domain.model.displayName
 import com.mraphaelpy.terriflow.domain.model.label
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.CustomZoomButtonsController
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
-import org.osmdroid.views.overlay.compass.CompassOverlay
-import org.osmdroid.views.overlay.compass.InternalCompassOrientationProvider
-import org.osmdroid.views.overlay.infowindow.InfoWindow
+
+@Stable
+class TerritoryMapState {
+    internal var mapView: MapView? = null
+    internal var locationOverlay: GoogleMapsStyleLocationOverlay? = null
+    internal var initialFitDone = false
+
+    fun fitTo(territories: List<Territory>) {
+        territories.bounds()?.let(::fitTo)
+    }
+
+    fun focus(territory: Territory) {
+        val shape = listOf(territory).bounds() ?: return
+        fitTo(shape, padding = 1.6f)
+    }
+
+    fun centerOnMyLocation(): Boolean {
+        val map = mapView ?: return false
+        val overlay = locationOverlay ?: return false
+        val location = overlay.myLocation
+        if (location != null) {
+            map.controller.animateTo(location, MY_LOCATION_ZOOM, ANIMATION_MS)
+            return true
+        }
+        overlay.runOnFirstFix {
+            map.post { overlay.myLocation?.let { map.controller.animateTo(it, MY_LOCATION_ZOOM, ANIMATION_MS) } }
+        }
+        return false
+    }
+
+    private fun fitTo(bounds: GeoBounds, padding: Float = 1.25f) {
+        val map = mapView ?: return
+        val isSinglePoint = bounds.north == bounds.south && bounds.east == bounds.west
+        val action = {
+            if (isSinglePoint) {
+                map.controller.animateTo(GeoPoint(bounds.north, bounds.east), SINGLE_POINT_ZOOM, ANIMATION_MS)
+            } else {
+                val box = BoundingBox(bounds.north, bounds.east, bounds.south, bounds.west).increaseByScale(padding)
+                map.zoomToBoundingBox(box, true)
+            }
+        }
+        if (map.width == 0 || map.height == 0) map.addOnFirstLayoutListener { _, _, _, _, _ -> action() } else action()
+    }
+
+    private companion object {
+        const val MY_LOCATION_ZOOM = 18.0
+        const val SINGLE_POINT_ZOOM = 17.0
+        const val ANIMATION_MS = 600L
+    }
+}
+
+private data class RenderKey(val territory: Territory, val highlighted: Boolean, val mine: Boolean)
+
+private class RenderedTerritory(val key: RenderKey, val polygons: List<Polygon>, val marker: Marker?)
 
 @Composable
 fun AllTerritoriesMap(
-    context: Context,
+    state: TerritoryMapState,
     territories: List<Territory>,
-    onMarkerClick: (String) -> Unit,
+    onTerritoryClick: (String) -> Unit,
+    modifier: Modifier = Modifier,
     highlightId: String? = null,
     currentUserId: String? = null,
-    onMapReady: (MapView) -> Unit = {}
+    locationEnabled: Boolean = false
 ) {
-    val markersMap = remember { HashMap<String, Marker>() }
-    val polygonsMap = remember { HashMap<String, MutableList<Polygon>>() }
-    val iconCache = remember { HashMap<String, android.graphics.drawable.Drawable>() }
-    var centeredOnHighlight by remember { mutableStateOf(false) }
-    var centeredInitial by remember { mutableStateOf(false) }
-    var locationOverlay by remember { mutableStateOf<GoogleMapsStyleLocationOverlay?>(null) }
-    var compassOverlay by remember { mutableStateOf<CompassOverlay?>(null) }
-    var internalMapView by remember { mutableStateOf<MapView?>(null) }
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val currentOnClick by rememberUpdatedState(onTerritoryClick)
+    val rendered = remember { HashMap<String, RenderedTerritory>() }
+    val iconCache = remember { HashMap<String, Drawable>() }
 
-    DisposableEffect(Unit) {
+    DisposableEffect(lifecycleOwner, locationEnabled) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> {
+                    state.mapView?.onResume()
+                    if (locationEnabled) state.locationOverlay?.enableMyLocation()
+                }
+                Lifecycle.Event.ON_PAUSE -> {
+                    state.locationOverlay?.disableMyLocation()
+                    state.mapView?.onPause()
+                }
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        if (locationEnabled && lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+            state.locationOverlay?.enableMyLocation()
+        }
         onDispose {
-            locationOverlay?.disableMyLocation()
-            compassOverlay?.disableCompass()
-            internalMapView?.onPause()
-            internalMapView?.onDetach()
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            state.locationOverlay?.disableMyLocation()
         }
     }
 
+    DisposableEffect(Unit) {
+        onDispose {
+            state.mapView?.onDetach()
+            state.mapView = null
+            state.locationOverlay = null
+        }
+    }
+
+    LaunchedEffect(territories.isNotEmpty(), highlightId) {
+        if (state.initialFitDone || territories.isEmpty()) return@LaunchedEffect
+        state.initialFitDone = true
+        val highlighted = territories.firstOrNull { it.id == highlightId }
+        if (highlighted != null) state.focus(highlighted) else state.fitTo(territories)
+    }
+
     AndroidView(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         factory = { ctx ->
             Configuration.getInstance().userAgentValue = ctx.packageName
             MapView(ctx).apply {
-                internalMapView = this
                 setTileSource(TileSourceFactory.MAPNIK)
                 setMultiTouchControls(true)
+                isTilesScaledToDpi = true
+                zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
+                minZoomLevel = 4.0
                 controller.setZoom(12.0)
                 controller.setCenter(GeoPoint(-23.5505, -46.6333))
 
-                val myLocOverlay = GoogleMapsStyleLocationOverlay(ctx, this).apply {
-                    enableMyLocation()
-                    enableFollowLocation()
-                }
-                overlays.add(myLocOverlay)
-                locationOverlay = myLocOverlay
-
-                val compass = CompassOverlay(ctx, InternalCompassOrientationProvider(ctx), this)
-                compass.enableCompass()
-                overlays.add(compass)
-                compassOverlay = compass
-
-                onMapReady(this)
+                val overlay = GoogleMapsStyleLocationOverlay(ctx, this)
+                overlays.add(overlay)
+                state.locationOverlay = overlay
+                state.mapView = this
             }
         },
         update = { mapView ->
-            val currentIds = territories.map { it.id }.toSet()
-
-            markersMap.keys.filter { it !in currentIds }.forEach { id ->
-                markersMap[id]?.let { mapView.overlays.remove(it) }
-                markersMap.remove(id)
-            }
-            polygonsMap.keys.filter { it !in currentIds }.forEach { id ->
-                polygonsMap[id]?.forEach { mapView.overlays.remove(it) }
-                polygonsMap.remove(id)
+            val desired = territories.associate { territory ->
+                territory.id to RenderKey(
+                    territory = territory,
+                    highlighted = territory.id == highlightId,
+                    mine = currentUserId != null && territory.currentResponsibleId == currentUserId
+                )
             }
 
-            territories.forEach { territory ->
-                val isHighlighted = territory.id == highlightId
-                val isMine = territory.currentResponsibleId == currentUserId && currentUserId != null
-                val tColor = territoryColor(territory.id)
-                val color = tColor.toArgb()
-
-                val fillAlpha = when {
-                    isHighlighted -> 0.45f
-                    isMine        -> 0.32f
-                    else          -> 0.20f
-                }
-                val strokeAlpha = when {
-                    isHighlighted -> 255
-                    isMine        -> 220
-                    else          -> 180
-                }
-                val strokeWidth = when {
-                    isHighlighted -> 5f
-                    isMine        -> 3.5f
-                    else          -> 2.5f
-                }
-
-                fun makePolyPaint(points: List<org.osmdroid.util.GeoPoint>): Polygon = Polygon().apply {
-                    this.points = points.toMutableList()
-                    val c = tColor.copy(alpha = fillAlpha)
-                    fillPaint.color = android.graphics.Color.argb(
-                        (c.alpha * 255).toInt(),
-                        (c.red * 255).toInt(),
-                        (c.green * 255).toInt(),
-                        (c.blue * 255).toInt()
-                    )
-                    outlinePaint.color = android.graphics.Color.argb(
-                        strokeAlpha,
-                        android.graphics.Color.red(color),
-                        android.graphics.Color.green(color),
-                        android.graphics.Color.blue(color)
-                    )
-                    outlinePaint.strokeWidth = strokeWidth
-                    setOnClickListener { _, _, _ ->
-                        InfoWindow.closeAllInfoWindowsOn(mapView)
-                        onMarkerClick(territory.id)
-                        true
-                    }
-                }
-
-                polygonsMap[territory.id]?.forEach { mapView.overlays.remove(it) }
-                val newPolys = mutableListOf<Polygon>()
-
-                when {
-                    territory.blockPolygons.isNotEmpty() -> {
-                        territory.blockPolygons.forEach { block ->
-                            if (block.size >= 3) {
-                                val pts = block.map { GeoPoint(it.lat, it.lng) }.toMutableList()
-                                pts.add(pts.first())
-                                val poly = makePolyPaint(pts)
-                                newPolys.add(poly)
-                                mapView.overlays.add(0, poly)
-                            }
-                        }
-                    }
-                    territory.boundaryPoints.size >= 3 -> {
-                        val pts = territory.boundaryPoints.map { GeoPoint(it.lat, it.lng) }.toMutableList()
-                        pts.add(pts.first())
-                        val poly = makePolyPaint(pts)
-                        newPolys.add(poly)
-                        mapView.overlays.add(0, poly)
-                    }
-                }
-
-                polygonsMap[territory.id] = newPolys
-
-                val lat = territory.latitude
-                    ?: if (territory.blockPolygons.isNotEmpty())
-                        territory.blockPolygons.flatten().map { it.lat }.average()
-                    else null
-                val lng = territory.longitude
-                    ?: if (territory.blockPolygons.isNotEmpty())
-                        territory.blockPolygons.flatten().map { it.lng }.average()
-                    else null
-
-                val snippetText = buildString {
-                    append(territory.status.label())
-                    territory.currentResponsibleName?.let { append(" · $it") }
-                }
-
-                if (lat != null && lng != null) {
-                    val geoPoint = GeoPoint(lat, lng)
-                    val iconKey = "${territory.id}_${territory.code}_${territory.status.name}_${color}_${territory.currentResponsibleName.orEmpty()}_${isHighlighted}_$isMine"
-                    val markerIcon = iconCache.getOrPut(iconKey) {
-                        when {
-                            isHighlighted -> createStatusMarkerIcon(context, color, territory.code, territory.currentResponsibleName, scale = 1.4f, showStar = true)
-                            isMine        -> createStatusMarkerIcon(context, color, territory.code, territory.currentResponsibleName, scale = 1.2f, showStar = false)
-                            else          -> createStatusMarkerIcon(context, color, territory.code, territory.currentResponsibleName, scale = 1.0f, showStar = false)
-                        }
-                    }
-
-                    val existing = markersMap[territory.id]
-                    if (existing != null) {
-                        existing.position = geoPoint
-                        existing.title = "${territory.code} — ${territory.name}"
-                        existing.snippet = snippetText
-                        existing.icon = markerIcon
-                    } else {
-                        val marker = Marker(mapView).apply {
-                            position = geoPoint
-                            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-                            title = "${territory.code} — ${territory.name}"
-                            snippet = snippetText
-                            icon = markerIcon
-                            setOnMarkerClickListener { _, _ ->
-                                InfoWindow.closeAllInfoWindowsOn(mapView)
-                                onMarkerClick(territory.id)
-                                true
-                            }
-                        }
-                        markersMap[territory.id] = marker
-                        mapView.overlays.add(marker)
-                    }
-                } else {
-                    markersMap[territory.id]?.let { mapView.overlays.remove(it) }
-                    markersMap.remove(territory.id)
-                }
+            val stale = rendered.filter { (id, item) -> desired[id] != item.key }
+            stale.forEach { (id, item) ->
+                mapView.overlays.removeAll(item.polygons.toSet())
+                item.marker?.let { mapView.overlays.remove(it) }
+                rendered.remove(id)
             }
 
-            if (highlightId != null && !centeredOnHighlight) {
-                val t = territories.find { it.id == highlightId }
-                if (t != null) {
-                    centeredOnHighlight = true
-                    val allPts = t.blockPolygons.flatten()
-                    val lat = t.latitude ?: t.boundaryPoints.firstOrNull()?.lat ?: allPts.firstOrNull()?.lat
-                    val lng = t.longitude ?: t.boundaryPoints.firstOrNull()?.lng ?: allPts.firstOrNull()?.lng
-                    if (lat != null && lng != null) {
-                        if (allPts.size >= 2) {
-                            val bbox = BoundingBox(allPts.maxOf { it.lat }, allPts.maxOf { it.lng }, allPts.minOf { it.lat }, allPts.minOf { it.lng })
-                            mapView.post { mapView.zoomToBoundingBox(bbox.increaseByScale(1.4f), true) }
-                        } else {
-                            mapView.controller.animateTo(GeoPoint(lat, lng))
-                            mapView.controller.setZoom(17.0)
-                        }
-                    }
-                }
-            } else if (highlightId == null && !centeredInitial) {
-                val allLats = territories.mapNotNull { it.latitude } +
-                    territories.flatMap { it.boundaryPoints.map { bp -> bp.lat } } +
-                    territories.flatMap { t -> t.blockPolygons.flatten().map { it.lat } }
-                val allLngs = territories.mapNotNull { it.longitude } +
-                    territories.flatMap { it.boundaryPoints.map { bp -> bp.lng } } +
-                    territories.flatMap { t -> t.blockPolygons.flatten().map { it.lng } }
-                if (allLats.isNotEmpty() && allLngs.isNotEmpty()) {
-                    centeredInitial = true
-                    runCatching {
-                        val box = BoundingBox(allLats.max(), allLngs.max(), allLats.min(), allLngs.min())
-                        mapView.post { mapView.zoomToBoundingBox(box.increaseByScale(1.3f), true) }
-                    }
-                }
+            var added = false
+            desired.forEach { (id, key) ->
+                if (id in rendered) return@forEach
+                added = true
+                val polygons = buildPolygons(key) { currentOnClick(id) }
+                polygons.forEach { mapView.overlays.add(0, it) }
+                val marker = buildMarker(mapView, key, iconCache) { currentOnClick(id) }
+                marker?.let { mapView.overlays.add(it) }
+                rendered[id] = RenderedTerritory(key, polygons, marker)
             }
 
-            mapView.invalidate()
+            if (stale.isNotEmpty() || added) mapView.invalidate()
         }
     )
+}
+
+private fun buildPolygons(key: RenderKey, onClick: () -> Unit): List<Polygon> {
+    val territory = key.territory
+    val shapes = when {
+        territory.hasBlocks -> territory.blockPolygons.filter { it.size >= 3 }
+        territory.hasBoundary -> listOf(territory.boundaryPoints)
+        else -> emptyList()
+    }
+    val color = statusColor(territory.status)
+    val fillAlpha = when {
+        key.highlighted -> 0.45f
+        key.mine -> 0.32f
+        else -> 0.2f
+    }
+    val strokeWidth = when {
+        key.highlighted -> 6f
+        key.mine -> 4f
+        else -> 2.5f
+    }
+    return shapes.map { shape ->
+        Polygon().apply {
+            points = shape.toClosedGeoPoints()
+            fillPaint.color = color.copy(alpha = fillAlpha).toArgb()
+            outlinePaint.color = color.copy(alpha = if (key.highlighted) 1f else 0.85f).toArgb()
+            outlinePaint.strokeWidth = strokeWidth
+            infoWindow = null
+            setOnClickListener { _, _, _ -> onClick(); true }
+        }
+    }
+}
+
+private fun buildMarker(
+    mapView: MapView,
+    key: RenderKey,
+    iconCache: MutableMap<String, Drawable>,
+    onClick: () -> Unit
+): Marker? {
+    val territory = key.territory
+    val center = territory.center ?: return null
+    val densityScale = mapView.resources.displayMetrics.density / MARKER_REFERENCE_DENSITY
+    val scale = densityScale * when {
+        key.highlighted -> 1.1f
+        key.mine -> 0.9f
+        else -> 0.75f
+    }
+    val iconKey = listOf(territory.code, territory.status, territory.currentResponsibleName, scale, key.highlighted)
+        .joinToString("|")
+    val icon = iconCache.getOrPut(iconKey) {
+        createStatusMarkerIcon(
+            context = mapView.context,
+            color = statusColor(territory.status).toArgb(),
+            code = territory.code,
+            responsibleName = territory.currentResponsibleName,
+            scale = scale,
+            showStar = key.highlighted
+        )
+    }
+    return Marker(mapView).apply {
+        position = GeoPoint(center.lat, center.lng)
+        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+        title = territory.displayName
+        snippet = territory.status.label()
+        this.icon = icon
+        infoWindow = null
+        setOnMarkerClickListener { _, _ -> onClick(); true }
+    }
+}
+
+private const val MARKER_REFERENCE_DENSITY = 3f
+
+private fun List<LatLng>.toClosedGeoPoints(): List<GeoPoint> {
+    val points = map { GeoPoint(it.lat, it.lng) }
+    return if (points.first() == points.last()) points else points + points.first()
 }

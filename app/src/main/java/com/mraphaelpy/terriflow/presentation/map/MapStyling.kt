@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.net.toUri
+import com.mraphaelpy.terriflow.domain.model.TerritoryCode
 import com.mraphaelpy.terriflow.domain.model.TerritoryStatus
 import com.mraphaelpy.terriflow.domain.model.label
 
@@ -26,14 +27,6 @@ fun statusColor(status: TerritoryStatus): Color = when (status) {
 }
 
 private fun statusColorInt(status: TerritoryStatus): Int = statusColor(status).toArgb()
-
-fun territoryColor(territoryId: String): Color {
-    val h = territoryId.hashCode()
-    val hue        = ((h and 0x7FFFFFFF) % 360).toFloat()
-    val saturation = 0.55f + ((h ushr 8 and 0xFF) % 30) / 100f
-    val lightness  = 0.36f + ((h ushr 16 and 0xFF) % 18) / 100f
-    return Color.hsl(hue, saturation, lightness)
-}
 
 internal fun createStatusMarkerIcon(
     context: Context,
@@ -95,7 +88,7 @@ internal fun createStatusMarkerIcon(
     }
     canvas.drawPath(triPath, bodyPaint)
 
-    val shortCode = code.takeLast(3).trimStart('0').ifEmpty { "0" }
+    val shortCode = markerLabel(code)
     if (hasResponsible) {
         canvas.drawText(shortCode, w / 2f, bodyH / 2f - 4f * scale, codePaint)
         canvas.drawLine(
@@ -123,6 +116,16 @@ internal fun createStatusMarkerIcon(
     }
 
     return bitmap.toDrawable(context.resources)
+}
+
+internal fun markerLabel(code: String): String =
+    TerritoryCode.numberOf(code)?.toString() ?: code.trim().take(MAX_CUSTOM_LABEL_LENGTH)
+
+private const val MAX_CUSTOM_LABEL_LENGTH = 5
+
+fun openDirections(context: Context, lat: Double, lng: Double) {
+    val uri = "https://www.google.com/maps/dir/?api=1&destination=$lat,$lng".toUri()
+    context.startActivity(Intent(Intent.ACTION_VIEW, uri))
 }
 
 @SuppressLint("QueryPermissionsNeeded")

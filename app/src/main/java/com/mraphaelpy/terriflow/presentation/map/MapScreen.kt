@@ -1,6 +1,7 @@
 package com.mraphaelpy.terriflow.presentation.map
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -15,22 +16,28 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Directions
+import androidx.compose.material.icons.filled.LocationOff
 import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.OpenInFull
-import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonOff
-import androidx.compose.material.icons.filled.PersonPin
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SearchOff
+import androidx.compose.material.icons.filled.ZoomOutMap
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -41,29 +48,40 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SmallFloatingActionButton
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mraphaelpy.terriflow.domain.model.Territory
 import com.mraphaelpy.terriflow.domain.model.TerritoryStatus
+import com.mraphaelpy.terriflow.domain.model.center
 import com.mraphaelpy.terriflow.domain.model.label
-import org.osmdroid.views.MapView
-import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
+import kotlinx.coroutines.launch
+
+private val BottomNavClearance = 112.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -75,353 +93,387 @@ fun MapScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    var selectedStatus by remember { mutableStateOf<TerritoryStatus?>(null) }
-    var selectedTerritory by remember { mutableStateOf<Territory?>(null) }
-    var onlyMine by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val mapState = remember { TerritoryMapState() }
+    var selectedId by remember { mutableStateOf(highlightId) }
+    var hasLocationPermission by remember { mutableStateOf(context.hasLocationPermission()) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { _ -> }
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        hasLocationPermission = result.values.any { it }
+        if (!hasLocationPermission) {
+            scope.launch { snackbarHostState.showSnackbar("Permita a localização para ver onde você está no mapa") }
+        }
+    }
 
     LaunchedEffect(Unit) {
-        val fineGranted = ContextCompat.checkSelfPermission(
-            context, Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-        val coarseGranted = ContextCompat.checkSelfPermission(
-            context, Manifest.permission.ACCESS_COARSE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-        if (!fineGranted && !coarseGranted) {
-            permissionLauncher.launch(
-                arrayOf(
-                    Manifest.permission.ACCESS_FINE_LOCATION,
-                    Manifest.permission.ACCESS_COARSE_LOCATION
-                )
-            )
+        if (!hasLocationPermission) permissionLauncher.launch(LOCATION_PERMISSIONS)
+    }
+
+    LaunchedEffect(uiState.filter) {
+        if (uiState.filter.isActive && uiState.visibleTerritories.isNotEmpty()) {
+            mapState.fitTo(uiState.visibleTerritories)
         }
     }
 
-    LaunchedEffect(highlightId, uiState.territoriesWithLocation) {
-        if (highlightId != null && selectedTerritory == null) {
-            val t = uiState.territoriesWithLocation.find { it.id == highlightId }
-            if (t != null) selectedTerritory = t
-        }
-    }
-
-    val filtered = remember(uiState.territoriesWithLocation, selectedStatus, onlyMine, uiState.currentUserId) {
-        uiState.territoriesWithLocation
-            .let { list -> if (onlyMine && uiState.currentUserId != null)
-                list.filter { it.currentResponsibleId == uiState.currentUserId } else list }
-            .let { list -> if (selectedStatus != null) list.filter { it.status == selectedStatus } else list }
-    }
-
-    val myTerritories = remember(uiState.territoriesWithLocation, uiState.currentUserId) {
-        uiState.territoriesWithLocation.filter { it.currentResponsibleId == uiState.currentUserId }
-    }
+    val selectedTerritory = uiState.mappedTerritories.firstOrNull { it.id == selectedId }
 
     if (selectedTerritory != null) {
-        val territory = selectedTerritory!!
-        ModalBottomSheet(
-            onDismissRequest = { selectedTerritory = null }
-        ) {
+        ModalBottomSheet(onDismissRequest = { selectedId = null }) {
             TerritoryMapCard(
-                territory = territory,
+                territory = selectedTerritory,
+                isMine = selectedTerritory.currentResponsibleId == uiState.currentUserId,
                 onOpen = {
-                    selectedTerritory = null
-                    if (highlightId == territory.id) {
-                        onNavigateBack()
-                    } else {
-                        onNavigateToTerritory(territory.id)
-                    }
-                },
-                onDismiss = { selectedTerritory = null }
+                    selectedId = null
+                    if (highlightId == selectedTerritory.id) onNavigateBack() else onNavigateToTerritory(selectedTerritory.id)
+                }
             )
         }
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(if (onlyMine) "Meus territórios" else "Mapa de territórios")
-                        Text(
-                            "${filtered.size} de ${uiState.territoriesWithLocation.size} mapeados",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
+    Box(modifier = Modifier.fillMaxSize()) {
+        AllTerritoriesMap(
+            state = mapState,
+            territories = uiState.visibleTerritories,
+            highlightId = selectedId,
+            currentUserId = uiState.currentUserId,
+            locationEnabled = hasLocationPermission,
+            onTerritoryClick = { selectedId = it }
+        )
 
-                actions = {
-                    if (myTerritories.isNotEmpty()) {
-                        IconButton(onClick = { onlyMine = !onlyMine }) {
-                            Icon(
-                                imageVector = if (onlyMine) Icons.Default.PersonPin else Icons.Default.People,
-                                contentDescription = if (onlyMine) "Ver todos" else "Ver meus territórios",
-                                tint = if (onlyMine) MaterialTheme.colorScheme.primary
-                                       else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(top = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            MapSearchBar(
+                query = uiState.filter.query,
+                visibleCount = uiState.visibleTerritories.size,
+                totalCount = uiState.mappedTerritories.size,
+                showBack = highlightId != null,
+                onBack = onNavigateBack,
+                onQueryChange = viewModel::updateQuery,
+                modifier = Modifier.padding(horizontal = 12.dp)
+            )
+            MapFilterChips(
+                uiState = uiState,
+                onAllClick = viewModel::clearStatus,
+                onMineClick = viewModel::toggleOnlyMine,
+                onStatusClick = viewModel::toggleStatus
             )
         }
-    ) { padding ->
-        var mapViewRef by remember { mutableStateOf<MapView?>(null) }
 
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-
-            AllTerritoriesMap(
-                context = context,
-                territories = filtered,
-                highlightId = highlightId,
-                currentUserId = uiState.currentUserId,
-                onMapReady = { mapViewRef = it },
-                onMarkerClick = { territoryId ->
-                    selectedTerritory = uiState.territoriesWithLocation.find { it.id == territoryId }
-                }
+        when {
+            uiState.isLoading -> Unit
+            uiState.mappedTerritories.isEmpty() -> MapMessageCard(
+                icon = Icons.Default.LocationOff,
+                title = "Nenhum território no mapa",
+                message = if (uiState.unmappedCount > 0) {
+                    "${uiState.unmappedCount} território(s) ainda sem localização. Edite-os para marcar o pino ou o contorno."
+                } else {
+                    "Cadastre territórios e marque a localização para vê-los aqui."
+                },
+                modifier = Modifier.align(Alignment.Center)
             )
+            uiState.visibleTerritories.isEmpty() -> MapMessageCard(
+                icon = Icons.Default.SearchOff,
+                title = "Nenhum território encontrado",
+                message = "Nenhum território corresponde aos filtros atuais.",
+                actionLabel = "Limpar filtros",
+                onAction = viewModel::clearFilters,
+                modifier = Modifier.align(Alignment.Center)
+            )
+        }
 
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Surface(
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
-                    shadowElevation = 4.dp
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 16.dp, bottom = BottomNavClearance),
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (uiState.visibleTerritories.isNotEmpty()) {
+                SmallFloatingActionButton(
+                    onClick = { mapState.fitTo(uiState.visibleTerritories) },
+                    containerColor = MaterialTheme.colorScheme.surface
                 ) {
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        item {
-                            FilterChip(
-                                selected = selectedStatus == null,
-                                onClick = { selectedStatus = null },
-                                label = { Text("Todos (${uiState.territoriesWithLocation.size})") }
-                            )
-                        }
-                        items(TerritoryStatus.entries) { status ->
-                            val count = uiState.territoriesWithLocation.count { it.status == status }
-                            if (count > 0) {
-                                FilterChip(
-                                    selected = selectedStatus == status,
-                                    onClick = { selectedStatus = if (selectedStatus == status) null else status },
-                                    label = { Text("${status.label()} ($count)") },
-                                    colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = statusColor(status).copy(alpha = 0.3f)
-                                    )
-                                )
-                            }
-                        }
-                    }
+                    Icon(Icons.Default.ZoomOutMap, contentDescription = "Ver todos os territórios")
                 }
             }
-
-            Card(
-                modifier = Modifier.align(Alignment.BottomStart).padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 100.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
-                )
-            ) {
-                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Status", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                    TerritoryStatus.entries.forEach { status ->
-                        val count = uiState.territoriesWithLocation.count { it.status == status }
-                        if (count > 0) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Surface(
-                                    modifier = Modifier.size(10.dp),
-                                    shape = MaterialTheme.shapes.extraSmall,
-                                    color = statusColor(status)
-                                ) {}
-                                Text("${status.label()} ($count)", style = MaterialTheme.typography.labelSmall)
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (uiState.territoriesWithLocation.isEmpty()) {
-                Card(
-                    modifier = Modifier.align(Alignment.Center).padding(24.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f)
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(Icons.Default.MyLocation, contentDescription = null,
-                            modifier = Modifier.size(48.dp),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        Text("Nenhum território com localização", fontWeight = FontWeight.Medium)
-                        Text(
-                            "Edite os territórios e marque a localização no mapa.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            }
-
             FloatingActionButton(
                 onClick = {
-                    mapViewRef?.let { mv ->
-                        val myOverlay = mv.overlays
-                            .filterIsInstance<MyLocationNewOverlay>()
-                            .firstOrNull()
-                        val loc = myOverlay?.myLocation
-                        if (loc != null) {
-                            mv.controller.animateTo(loc)
-                            mv.controller.setZoom(18.0)
+                    when {
+                        !hasLocationPermission -> permissionLauncher.launch(LOCATION_PERMISSIONS)
+                        !mapState.centerOnMyLocation() -> scope.launch {
+                            snackbarHostState.showSnackbar("Procurando sua localização…")
                         }
                     }
                 },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 16.dp, bottom = 100.dp),
                 containerColor = MaterialTheme.colorScheme.primaryContainer
             ) {
-                Icon(
-                    Icons.Default.MyLocation,
-                    contentDescription = "Minha localização",
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer
+                Icon(Icons.Default.MyLocation, contentDescription = "Minha localização")
+            }
+        }
+
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = BottomNavClearance)
+        )
+    }
+}
+
+@Composable
+private fun MapSearchBar(
+    query: String,
+    visibleCount: Int,
+    totalCount: Int,
+    showBack: Boolean,
+    onBack: () -> Unit,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val focusManager = LocalFocusManager.current
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shadowElevation = 6.dp
+    ) {
+        TextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            placeholder = {
+                Text(
+                    "Buscar código, nome, rua ou responsável",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
+            },
+            leadingIcon = {
+                if (showBack) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Voltar")
+                    }
+                } else {
+                    Icon(Icons.Default.Search, contentDescription = null)
+                }
+            },
+            trailingIcon = {
+                if (query.isNotEmpty()) {
+                    IconButton(onClick = { onQueryChange("") }) {
+                        Icon(Icons.Default.Close, contentDescription = "Limpar busca")
+                    }
+                } else if (totalCount > 0) {
+                    Text(
+                        if (visibleCount == totalCount) "$totalCount" else "$visibleCount/$totalCount",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(end = 16.dp)
+                    )
+                }
+            },
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() }),
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = Color.Transparent,
+                unfocusedContainerColor = Color.Transparent,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent
+            )
+        )
+    }
+}
+
+@Composable
+private fun MapFilterChips(
+    uiState: MapUiState,
+    onAllClick: () -> Unit,
+    onMineClick: () -> Unit,
+    onStatusClick: (TerritoryStatus) -> Unit
+) {
+    val chipColors = FilterChipDefaults.filterChipColors(
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer
+    )
+    val statuses = TerritoryStatus.entries.filter { (uiState.statusCounts[it] ?: 0) > 0 }
+
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        item {
+            FilterChip(
+                selected = uiState.filter.status == null,
+                onClick = onAllClick,
+                label = { Text("Todos") },
+                colors = chipColors,
+                elevation = FilterChipDefaults.filterChipElevation(elevation = 2.dp)
+            )
+        }
+        if (uiState.myCount > 0) {
+            item {
+                FilterChip(
+                    selected = uiState.filter.onlyMine,
+                    onClick = onMineClick,
+                    label = { Text("Meus (${uiState.myCount})") },
+                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    colors = chipColors,
+                    elevation = FilterChipDefaults.filterChipElevation(elevation = 2.dp)
+                )
+            }
+        }
+        items(statuses, key = { it.name }) { status ->
+            FilterChip(
+                selected = uiState.filter.status == status,
+                onClick = { onStatusClick(status) },
+                label = { Text("${status.label()} (${uiState.statusCounts[status] ?: 0})") },
+                leadingIcon = {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .background(statusColor(status), CircleShape)
+                    )
+                },
+                colors = chipColors,
+                elevation = FilterChipDefaults.filterChipElevation(elevation = 2.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun MapMessageCard(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    message: String,
+    modifier: Modifier = Modifier,
+    actionLabel: String? = null,
+    onAction: () -> Unit = {}
+) {
+    Surface(
+        modifier = modifier.padding(32.dp),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shadowElevation = 6.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(40.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (actionLabel != null) {
+                TextButton(onClick = onAction) { Text(actionLabel) }
             }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TerritoryMapCard(
     territory: Territory,
-    onOpen: () -> Unit,
-    onDismiss: () -> Unit
+    isMine: Boolean,
+    onOpen: () -> Unit
 ) {
     val context = LocalContext.current
+    val color = statusColor(territory.status)
+    val center = territory.center
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = 20.dp)
             .padding(bottom = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(14.dp)
-                        .background(territoryColor(territory.id), CircleShape)
-                )
-                Column {
-                    Text(
-                        territory.code,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        territory.name,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 2
-                    )
-                }
-            }
-            Surface(
-                shape = MaterialTheme.shapes.small,
-                color = statusColor(territory.status).copy(alpha = 0.15f)
-            ) {
+        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    territory.status.label(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = statusColor(territory.status),
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                    territory.code,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold
                 )
+                Text(
+                    territory.name,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Surface(shape = RoundedCornerShape(50), color = color.copy(alpha = 0.15f)) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(modifier = Modifier.size(8.dp).background(color, CircleShape))
+                    Text(territory.status.label(), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium)
+                }
             }
         }
 
         HorizontalDivider()
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Icon(
-                imageVector = if (territory.currentResponsibleName != null) Icons.Default.Person else Icons.Default.PersonOff,
-                contentDescription = null,
-                modifier = Modifier.size(20.dp),
-                tint = if (territory.currentResponsibleName != null)
-                    MaterialTheme.colorScheme.primary
-                else
-                    MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Column {
-                Text(
-                    "Responsável",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    territory.currentResponsibleName ?: "Sem responsável",
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = if (territory.currentResponsibleName != null) FontWeight.Medium else FontWeight.Normal,
-                    color = if (territory.currentResponsibleName != null)
-                        MaterialTheme.colorScheme.onSurface
-                    else
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
 
-        if (territory.location.isNotEmpty()) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(Icons.Default.LocationOn, contentDescription = null,
-                    modifier = Modifier.size(20.dp),
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(territory.location,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+        InfoRow(
+            icon = if (territory.currentResponsibleName != null) Icons.Default.Person else Icons.Default.PersonOff,
+            label = "Responsável",
+            value = when {
+                territory.currentResponsibleName == null -> "Sem responsável"
+                isMine -> "${territory.currentResponsibleName} (você)"
+                else -> territory.currentResponsibleName
             }
+        )
+        if (territory.location.isNotBlank()) {
+            InfoRow(icon = Icons.Default.LocationOn, label = "Localização", value = territory.location)
         }
 
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(
-                onClick = { 
-                    val destLat = territory.latitude ?: territory.boundaryPoints.firstOrNull()?.lat
-                    val destLng = territory.longitude ?: territory.boundaryPoints.firstOrNull()?.lng
-                    openInGoogleMaps(context, destLat, destLng, territory.name)
-                },
-                modifier = Modifier.weight(1f),
-                enabled = territory.hasLocation || territory.hasBoundary
-            ) {
-                Icon(Icons.Default.Map, null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("Google Maps")
-            }
-            Button(
-                onClick = onOpen,
+                onClick = { center?.let { openDirections(context, it.lat, it.lng) } },
+                enabled = center != null,
                 modifier = Modifier.weight(1f)
             ) {
-                Icon(Icons.Default.OpenInFull, null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(4.dp))
-                Text("Abrir")
+                Icon(Icons.Default.Directions, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Como chegar")
+            }
+            Button(onClick = onOpen, modifier = Modifier.weight(1f)) {
+                Icon(Icons.Default.OpenInFull, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Detalhes")
             }
         }
     }
+}
+
+@Composable
+private fun InfoRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column {
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+        }
+    }
+}
+
+private val LOCATION_PERMISSIONS = arrayOf(
+    Manifest.permission.ACCESS_FINE_LOCATION,
+    Manifest.permission.ACCESS_COARSE_LOCATION
+)
+
+private fun Context.hasLocationPermission(): Boolean = LOCATION_PERMISSIONS.any {
+    ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
 }
