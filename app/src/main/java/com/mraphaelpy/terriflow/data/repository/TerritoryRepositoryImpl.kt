@@ -47,12 +47,6 @@ class TerritoryRepositoryImpl @Inject constructor(
         return runCatching { remoteSource.getById(congregationId, id)?.toDomain() }.getOrNull()
     }
 
-    override suspend fun getByCode(code: String): Territory? {
-        territoryDao.getByCode(code)?.let { return it.toDomain() }
-        val congregationId = congregationRepository.getCurrentCongregationId() ?: return null
-        return runCatching { remoteSource.getByCode(congregationId, code)?.toDomain() }.getOrNull()
-    }
-
     override suspend fun save(territory: Territory): Territory {
         val toSave = if (territory.id.isEmpty()) territory.copy(id = UUID.randomUUID().toString()) else territory
         val currentVersion = territoryDao.getById(toSave.id)?.syncVersion ?: 0L

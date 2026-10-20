@@ -8,7 +8,6 @@ data class DayGroup<T>(val label: String, val items: List<T>)
 
 object DayGrouping {
 
-    /** Agrupa itens já ordenados por data, com rótulos "Hoje", "Ontem" ou a data por extenso. */
     fun <T> group(items: List<T>, now: Date = Date(), dateOf: (T) -> Date): List<DayGroup<T>> {
         val today = dayKey(now)
         val yesterday = dayKey(Calendar.getInstance().apply { time = now; add(Calendar.DAY_OF_YEAR, -1) }.time)

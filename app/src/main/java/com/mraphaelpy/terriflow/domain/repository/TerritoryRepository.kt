@@ -9,7 +9,6 @@ interface TerritoryRepository {
     fun observeById(id: String): Flow<Territory?>
 
     suspend fun getById(id: String): Territory?
-    suspend fun getByCode(code: String): Territory?
 
     suspend fun save(territory: Territory): Territory
 

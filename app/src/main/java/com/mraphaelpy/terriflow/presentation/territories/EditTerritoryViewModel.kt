@@ -98,7 +98,7 @@ class EditTerritoryViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(boundaryPoints = points)
     }
 
-    fun save(code: String, name: String, description: String, location: String, notes: String) {
+    fun save(name: String, description: String, location: String, notes: String) {
         if (name.isBlank()) {
             _uiState.value = _uiState.value.copy(error = "O nome é obrigatório")
             return
@@ -110,7 +110,6 @@ class EditTerritoryViewModel @Inject constructor(
                 updateTerritoryUseCase(
                     id = territoryId,
                     changes = TerritoryChanges(
-                        code = code.ifBlank { null },
                         name = name,
                         description = description,
                         location = location,

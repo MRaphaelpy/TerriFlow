@@ -4,7 +4,6 @@ sealed class DomainException(message: String, cause: Throwable? = null) : Except
     class NotAuthenticated : DomainException("Usuário não autenticado")
     class TerritoryNotFound : DomainException("Território não encontrado")
     class UserNotFound : DomainException("Responsável não encontrado")
-    class DuplicateTerritoryCode(code: String) : DomainException("Já existe um território com o código '$code'")
     class ActionNotAllowed(action: TerritoryAction) :
         DomainException("Ação não permitida: ${action.label()}")
     class AlreadyInCongregation(name: String) :

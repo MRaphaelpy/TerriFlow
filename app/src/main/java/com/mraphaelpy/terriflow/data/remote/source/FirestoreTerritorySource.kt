@@ -47,16 +47,6 @@ class FirestoreTerritorySource @Inject constructor(
     suspend fun getById(congregationId: String, id: String): TerritoryDto? =
         TerritoryDto.fromDocument(territoriesCollection(congregationId).document(id).get().await())
 
-    suspend fun getByCode(congregationId: String, code: String): TerritoryDto? =
-        territoriesCollection(congregationId)
-            .whereEqualTo("code", code)
-            .limit(1)
-            .get()
-            .await()
-            .documents
-            .firstOrNull()
-            ?.let(TerritoryDto::fromDocument)
-
     fun upsert(congregationId: String, territory: Territory, syncVersion: Long): Task<Void> =
         territoriesCollection(congregationId)
             .document(territory.id)

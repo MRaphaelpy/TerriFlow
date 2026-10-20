@@ -1,6 +1,5 @@
 package com.mraphaelpy.terriflow.domain.usecase.territory
 
-import com.mraphaelpy.terriflow.domain.model.DomainException
 import com.mraphaelpy.terriflow.domain.model.EventType
 import com.mraphaelpy.terriflow.domain.model.LatLng
 import com.mraphaelpy.terriflow.domain.model.TerritoryAction
@@ -11,7 +10,6 @@ import java.util.Date
 import javax.inject.Inject
 
 data class TerritoryChanges(
-    val code: String?,
     val name: String,
     val description: String,
     val location: String,
@@ -30,19 +28,7 @@ class UpdateTerritoryUseCase @Inject constructor(
         val (actor, existing) = guard.authorize(id, TerritoryAction.EDIT)
         val now = Date()
 
-        val requestedCode = changes.code?.trim().orEmpty()
-        val finalCode = if (requestedCode.isNotEmpty() && requestedCode != existing.code) {
-            val duplicate = territoryRepository.getByCode(requestedCode)
-            if (duplicate != null && duplicate.id != id) {
-                throw DomainException.DuplicateTerritoryCode(requestedCode)
-            }
-            requestedCode
-        } else {
-            existing.code
-        }
-
         val updated = existing.copy(
-            code = finalCode,
             name = changes.name.trim(),
             description = changes.description.trim(),
             location = changes.location.trim(),
@@ -66,7 +52,6 @@ class UpdateTerritoryUseCase @Inject constructor(
                         put(key, after)
                         put("${key}From", before)
                     }
-                    change("code", existing.code, updated.code)
                     change("name", existing.name, updated.name)
                     change("location", existing.location, updated.location)
                     change("description", existing.description, updated.description)

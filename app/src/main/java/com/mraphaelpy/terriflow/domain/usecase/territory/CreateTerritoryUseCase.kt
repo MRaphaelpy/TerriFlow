@@ -1,6 +1,5 @@
 package com.mraphaelpy.terriflow.domain.usecase.territory
 
-import com.mraphaelpy.terriflow.domain.model.DomainException
 import com.mraphaelpy.terriflow.domain.model.EventType
 import com.mraphaelpy.terriflow.domain.model.Territory
 import com.mraphaelpy.terriflow.domain.model.TerritoryEvent
@@ -17,7 +16,6 @@ class CreateTerritoryUseCase @Inject constructor(
     private val eventRepository: TerritoryEventRepository
 ) {
     suspend operator fun invoke(
-        code: String?,
         name: String,
         description: String,
         location: String,
@@ -25,15 +23,7 @@ class CreateTerritoryUseCase @Inject constructor(
     ): Territory {
         val actor = guard.requireCanCreate()
 
-        val requestedCode = code?.trim().orEmpty()
-        val finalCode = if (requestedCode.isNotEmpty()) {
-            if (territoryRepository.getByCode(requestedCode) != null) {
-                throw DomainException.DuplicateTerritoryCode(requestedCode)
-            }
-            requestedCode
-        } else {
-            territoryRepository.getNextCode()
-        }
+        val finalCode = territoryRepository.getNextCode()
 
         val now = Date()
         val territory = Territory(

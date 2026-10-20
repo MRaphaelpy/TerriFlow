@@ -32,11 +32,11 @@ class CreateTerritoryUseCaseTest {
     }
 
     @Test
-    fun `gera codigo automatico quando nenhum e informado`() = runTest {
+    fun `sempre gera o codigo automatico`() = runTest {
         coEvery { authRepository.getCurrentUser() } returns admin
         coEvery { territoryRepository.getNextCode() } returns "T-00005"
 
-        val result = create(code = " ", name = " Centro ", description = "", location = "", notes = "")
+        val result = create(name = " Centro ", description = "", location = "", notes = "")
 
         assertEquals("T-00005", result.code)
         assertEquals("Centro", result.name)
@@ -44,26 +44,18 @@ class CreateTerritoryUseCaseTest {
         coVerify { eventRepository.save(any()) }
     }
 
-    @Test(expected = DomainException.DuplicateTerritoryCode::class)
-    fun `rejeita codigo ja existente`() = runTest {
-        coEvery { authRepository.getCurrentUser() } returns admin
-        coEvery { territoryRepository.getByCode("T-00001") } returns Fixtures.territory()
-
-        create(code = "T-00001", name = "Centro", description = "", location = "", notes = "")
-    }
-
     @Test(expected = DomainException.ActionNotAllowed::class)
     fun `publicador nao pode criar territorio`() = runTest {
         coEvery { authRepository.getCurrentUser() } returns publisher
 
-        create(code = null, name = "Centro", description = "", location = "", notes = "")
+        create(name = "Centro", description = "", location = "", notes = "")
     }
 
     @Test(expected = DomainException.NotAuthenticated::class)
     fun `exige usuario autenticado`() = runTest {
         coEvery { authRepository.getCurrentUser() } returns null
 
-        create(code = null, name = "Centro", description = "", location = "", notes = "")
+        create(name = "Centro", description = "", location = "", notes = "")
     }
 
     @Test

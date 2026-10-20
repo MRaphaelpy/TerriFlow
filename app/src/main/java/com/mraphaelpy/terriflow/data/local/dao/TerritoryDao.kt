@@ -20,9 +20,6 @@ interface TerritoryDao {
     @Query("SELECT * FROM territories WHERE id = :id")
     suspend fun getById(id: String): TerritoryEntity?
 
-    @Query("SELECT * FROM territories WHERE code = :code AND deletedAt IS NULL LIMIT 1")
-    suspend fun getByCode(code: String): TerritoryEntity?
-
     @Query("SELECT * FROM territories WHERE synced = 0 AND deletedAt IS NULL")
     suspend fun getPending(): List<TerritoryEntity>
 
