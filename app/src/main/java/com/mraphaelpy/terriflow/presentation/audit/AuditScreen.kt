@@ -66,6 +66,7 @@ import com.mraphaelpy.terriflow.presentation.components.SheetOption
 import com.mraphaelpy.terriflow.presentation.components.TerritoryShapeBadge
 import com.mraphaelpy.terriflow.presentation.components.UserAvatar
 import com.mraphaelpy.terriflow.presentation.components.eventIcon
+import com.mraphaelpy.terriflow.presentation.components.segmentedShape
 
 private enum class AuditSheet { PERIOD, TYPE, TERRITORY, USER }
 
@@ -153,7 +154,7 @@ fun AuditScreen(
                             AuditItem(
                                 entry = entry,
                                 color = uiState.palette[entry.event.territoryId] ?: MaterialTheme.colorScheme.primary,
-                                shape = segmentShape(index, day.entries.size),
+                                shape = segmentedShape(index, day.entries.size, outer = 20.dp),
                                 onClick = { onNavigateToTerritory(entry.event.territoryId) }
                             )
                         }
@@ -311,10 +312,4 @@ private fun EmptyAudit() {
         Text("Nenhum registro neste período", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
         Text("Ajuste o período ou os filtros.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
-}
-
-private fun segmentShape(index: Int, count: Int): RoundedCornerShape {
-    val top = if (index == 0) 20.dp else 6.dp
-    val bottom = if (index == count - 1) 20.dp else 6.dp
-    return RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom)
 }

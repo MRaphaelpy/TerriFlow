@@ -89,6 +89,7 @@ import com.mraphaelpy.terriflow.presentation.components.TerritoryShapeBadge
 import com.mraphaelpy.terriflow.presentation.components.TerritoryStatusDisplayOrder
 import com.mraphaelpy.terriflow.presentation.components.UserAvatar
 import com.mraphaelpy.terriflow.presentation.components.eventIcon
+import com.mraphaelpy.terriflow.presentation.components.segmentedShape
 import com.mraphaelpy.terriflow.presentation.components.statusColor
 import com.mraphaelpy.terriflow.presentation.territorydetail.statusSince
 
@@ -262,7 +263,7 @@ fun DashboardScreen(
                         ActivityRow(
                             activity = activity,
                             color = activity.territory?.let { uiState.palette[it.id] } ?: MaterialTheme.colorScheme.primary,
-                            shape = segmentShape(index, uiState.recentActivity.size),
+                            shape = segmentedShape(index, uiState.recentActivity.size),
                             onClick = { onNavigateToTerritory(activity.event.territoryId) }
                         )
                     }
@@ -274,12 +275,6 @@ fun DashboardScreen(
 
 private fun greeting(user: User?): String =
     user?.name?.trim()?.split(" ")?.firstOrNull()?.takeIf { it.isNotEmpty() }?.let { "Olá, $it" } ?: "TerriFlow"
-
-private fun segmentShape(index: Int, count: Int): Shape {
-    val top = if (index == 0) 24.dp else 6.dp
-    val bottom = if (index == count - 1) 24.dp else 6.dp
-    return RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom)
-}
 
 @Composable
 private fun SectionTitle(text: String, modifier: Modifier = Modifier) {

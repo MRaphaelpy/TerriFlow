@@ -77,6 +77,7 @@ import com.mraphaelpy.terriflow.domain.model.label
 import com.mraphaelpy.terriflow.presentation.components.FullScreenLoading
 import com.mraphaelpy.terriflow.presentation.components.PillSearchField
 import com.mraphaelpy.terriflow.presentation.components.UserAvatar
+import com.mraphaelpy.terriflow.presentation.components.segmentedShape
 
 private sealed interface PendingAction {
     data class Rename(val user: User) : PendingAction
@@ -220,7 +221,7 @@ fun UsersScreen(
                                 user = user,
                                 isSelf = uiState.currentUser?.id == user.id,
                                 territories = uiState.currentTerritories[user.id] ?: 0,
-                                shape = segmentShape(index, section.users.size),
+                                shape = segmentedShape(index, section.users.size),
                                 onClick = { selectedUser = user },
                                 modifier = Modifier.animateItem()
                             )
@@ -479,10 +480,4 @@ private fun EditUserNameDialog(user: User, isSelf: Boolean, onDismiss: () -> Uni
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
     )
-}
-
-private fun segmentShape(index: Int, count: Int): RoundedCornerShape {
-    val top = if (index == 0) 24.dp else 6.dp
-    val bottom = if (index == count - 1) 24.dp else 6.dp
-    return RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom)
 }

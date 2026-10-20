@@ -21,8 +21,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.CircularWavyProgressIndicator
@@ -32,17 +32,17 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
@@ -73,6 +73,7 @@ import com.mraphaelpy.terriflow.presentation.components.OptionSheet
 import com.mraphaelpy.terriflow.presentation.components.SheetOption
 import com.mraphaelpy.terriflow.presentation.components.TerritoryShapeBadge
 import com.mraphaelpy.terriflow.presentation.components.UserAvatarByName
+import com.mraphaelpy.terriflow.presentation.components.segmentedShape
 import java.util.Date
 import java.util.concurrent.TimeUnit
 import kotlin.math.roundToInt
@@ -235,7 +236,7 @@ fun CoverageScreen(
                         CoverageRow(
                             coverage = coverage,
                             color = uiState.palette[coverage.territory.id] ?: MaterialTheme.colorScheme.primary,
-                            shape = segmentShape(index, uiState.coverages.size),
+                            shape = segmentedShape(index, uiState.coverages.size, outer = 20.dp),
                             onClick = { onNavigateToTerritory(coverage.territory.id) }
                         )
                     }
@@ -269,7 +270,7 @@ fun CoverageScreen(
                 }
                 CoverageTab.RESPONSIBLES -> {
                     itemsIndexed(uiState.responsibles, key = { _, it -> it.responsibleId ?: it.name }) { index, stats ->
-                        ResponsibleRow(stats, segmentShape(index, uiState.responsibles.size))
+                        ResponsibleRow(stats, segmentedShape(index, uiState.responsibles.size, outer = 20.dp))
                     }
                     if (uiState.responsibles.isEmpty()) {
                         item { Text("Nenhuma designação registrada.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -403,10 +404,4 @@ private fun monthsAgo(date: Date): String {
         days < 365 -> "há ${days / 30} meses"
         else -> "há ${days / 365} ano${if (days >= 730) "s" else ""}"
     }
-}
-
-private fun segmentShape(index: Int, count: Int): RoundedCornerShape {
-    val top = if (index == 0) 20.dp else 6.dp
-    val bottom = if (index == count - 1) 20.dp else 6.dp
-    return RoundedCornerShape(topStart = top, topEnd = top, bottomStart = bottom, bottomEnd = bottom)
 }
