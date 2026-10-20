@@ -45,7 +45,7 @@ class MainViewModel @Inject constructor(
     }
 
     fun dismissUpdate() {
-        _availableUpdate.value?.let { updateManager.dismissVersion(it.latestVersion) }
+        _availableUpdate.value?.let { updateManager.snooze(it.latestVersion) }
         _availableUpdate.value = null
     }
 
@@ -67,8 +67,9 @@ class MainViewModel @Inject constructor(
 
     private fun checkForUpdate() {
         viewModelScope.launch {
+            updateManager.cleanUpInstalledUpdate()
             val info = updateManager.checkForUpdate() ?: return@launch
-            if (info.hasUpdate && !updateManager.isVersionDismissed(info.latestVersion)) {
+            if (info.hasUpdate && !updateManager.isSnoozed(info.latestVersion)) {
                 _availableUpdate.value = info
             }
         }

@@ -13,9 +13,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
-import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.MessageDigest
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -23,165 +24,170 @@ import javax.inject.Singleton
 class AppUpdateManager @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
-    companion object {
-        private const val GITHUB_OWNER = "MRaphaelpy"
-        private const val GITHUB_REPO = "TerriFlow"
-        private const val RELEASES_API_URL = "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
-        private const val KEY_DISMISSED_VERSION = "dismissed_version"
-    }
-
     private val prefs = context.getSharedPreferences("terriflow_updater", Context.MODE_PRIVATE)
 
-    fun isVersionDismissed(version: String): Boolean =
-        prefs.getString(KEY_DISMISSED_VERSION, null) == VersionComparator.clean(version)
+    private val apkFile: File get() = File(File(context.getExternalFilesDir(null), "Download"), APK_NAME)
 
-    fun dismissVersion(version: String) {
-        prefs.edit { putString(KEY_DISMISSED_VERSION, VersionComparator.clean(version)) }
+    val currentVersion: String
+        get() = runCatching {
+            val info = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.packageManager.getPackageInfo(context.packageName, android.content.pm.PackageManager.PackageInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getPackageInfo(context.packageName, 0)
+            }
+            info.versionName?.takeIf { it.isNotBlank() }
+        }.getOrNull() ?: BuildConfig.VERSION_NAME
+
+    fun isSnoozed(version: String): Boolean {
+        if (prefs.getString(KEY_SNOOZED_VERSION, null) != VersionComparator.clean(version)) return false
+        val until = prefs.getLong(KEY_SNOOZED_UNTIL, 0L)
+        return System.currentTimeMillis() < until
+    }
+
+    fun snooze(version: String) {
+        prefs.edit {
+            putString(KEY_SNOOZED_VERSION, VersionComparator.clean(version))
+            putLong(KEY_SNOOZED_UNTIL, System.currentTimeMillis() + TimeUnit.HOURS.toMillis(SNOOZE_HOURS))
+        }
+    }
+
+    fun cleanUpInstalledUpdate() {
+        val downloadedVersion = prefs.getString(KEY_DOWNLOADED_VERSION, null) ?: return
+        if (!VersionComparator.isNewer(downloadedVersion, currentVersion)) {
+            apkFile.delete()
+            prefs.edit { remove(KEY_DOWNLOADED_VERSION) }
+        }
     }
 
     suspend fun checkForUpdate(): AppUpdateInfo? = withContext(Dispatchers.IO) {
         runCatching {
-            val url = URL(RELEASES_API_URL)
-            val connection = (url.openConnection() as HttpURLConnection).apply {
-                requestMethod = "GET"
-                setRequestProperty("Accept", "application/vnd.github.v3+json")
-                setRequestProperty("User-Agent", "TerriFlow-App")
-                connectTimeout = 8000
-                readTimeout = 8000
+            val connection = open(RELEASES_API_URL).apply {
+                setRequestProperty("Accept", "application/vnd.github+json")
             }
-
-            if (connection.responseCode != 200) return@runCatching null
-
-            val responseBody = connection.inputStream.bufferedReader().use { it.readText() }
-            val json = JSONObject(responseBody)
+            if (connection.responseCode != HttpURLConnection.HTTP_OK) return@runCatching null
+            val json = JSONObject(connection.inputStream.bufferedReader().use { it.readText() })
 
             val tagName = json.optString("tag_name", "")
-            val title = json.optString("name", tagName)
-            val changelog = json.optString("body", "Melhorias gerais e correções de bugs.")
+            val assets = json.optJSONArray("assets") ?: return@runCatching null
+            val apk = (0 until assets.length())
+                .map { assets.getJSONObject(it) }
+                .firstOrNull { it.optString("name").endsWith(".apk", ignoreCase = true) }
+                ?: return@runCatching null
 
-            var downloadUrl = ""
-            var apkSize = 0L
-
-            val assets = json.optJSONArray("assets")
-            if (assets != null) {
-                for (i in 0 until assets.length()) {
-                    val asset = assets.getJSONObject(i)
-                    val name = asset.optString("name", "")
-                    if (name.endsWith(".apk", ignoreCase = true)) {
-                        downloadUrl = asset.optString("browser_download_url", "")
-                        apkSize = asset.optLong("size", 0L)
-                        break
-                    }
-                }
-            }
-
-            if (downloadUrl.isEmpty()) return@runCatching null
-
-            val currentVersion = runCatching {
-                val pInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    context.packageManager.getPackageInfo(context.packageName, android.content.pm.PackageManager.PackageInfoFlags.of(0))
-                } else {
-                    @Suppress("DEPRECATION")
-                    context.packageManager.getPackageInfo(context.packageName, 0)
-                }
-                pInfo.versionName?.takeIf { it.isNotBlank() } ?: BuildConfig.VERSION_NAME
-            }.getOrDefault(BuildConfig.VERSION_NAME)
-
-            val isNewer = VersionComparator.isNewer(tagName, currentVersion)
-
+            val current = currentVersion
             AppUpdateInfo(
-                hasUpdate = isNewer,
-                currentVersion = currentVersion,
+                hasUpdate = VersionComparator.isNewer(tagName, current),
+                currentVersion = current,
                 latestVersion = VersionComparator.clean(tagName),
-                releaseTitle = title,
-                changelog = changelog,
-                downloadUrl = downloadUrl,
-                apkSize = apkSize
+                releaseTitle = json.optString("name", tagName),
+                changelog = ReleaseNotes.clean(json.optString("body", "")),
+                downloadUrl = apk.optString("browser_download_url"),
+                apkSize = apk.optLong("size", 0L),
+                sha256 = apk.optString("digest").takeIf { it.startsWith("sha256:") }?.removePrefix("sha256:")
             )
         }.getOrNull()
     }
 
-    suspend fun downloadApk(
-        downloadUrl: String,
-        onProgress: (Float) -> Unit
-    ): File? = withContext(Dispatchers.IO) {
-        runCatching {
-            val url = URL(downloadUrl)
-            val connection = (url.openConnection() as HttpURLConnection).apply {
-                requestMethod = "GET"
-                instanceFollowRedirects = true
-                setRequestProperty("User-Agent", "TerriFlow-App")
-                connectTimeout = 15000
-                readTimeout = 30000
+    suspend fun downloadApk(update: AppUpdateInfo, onProgress: (Float) -> Unit): DownloadResult = withContext(Dispatchers.IO) {
+        val file = apkFile.apply { parentFile?.mkdirs(); delete() }
+        try {
+            val connection = followRedirects(open(update.downloadUrl))
+            if (connection.responseCode != HttpURLConnection.HTTP_OK) {
+                return@withContext DownloadResult.Failure("Servidor respondeu ${connection.responseCode}. Tente novamente.")
             }
+            val total = connection.contentLengthLong.takeIf { it > 0 } ?: update.apkSize
+            val digest = MessageDigest.getInstance("SHA-256")
+            var downloaded = 0L
+            var lastPercent = -1
 
-            val finalConnection = if (connection.responseCode in listOf(301, 302, 303, 307, 308)) {
-                val newUrl = connection.getHeaderField("Location")
-                (URL(newUrl).openConnection() as HttpURLConnection).apply {
-                    requestMethod = "GET"
-                    setRequestProperty("User-Agent", "TerriFlow-App")
-                }
-            } else {
-                connection
-            }
-
-            val totalBytes = finalConnection.contentLengthLong
-            val updateDir = File(context.getExternalFilesDir(null), "Download").apply { mkdirs() }
-            val apkFile = File(updateDir, "terriflow-update.apk")
-            if (apkFile.exists()) apkFile.delete()
-
-            finalConnection.inputStream.use { input ->
-                FileOutputStream(apkFile).use { output ->
-                    val buffer = ByteArray(8 * 1024)
-                    var bytesRead: Int
-                    var totalDownloaded = 0L
-
-                    while (input.read(buffer).also { bytesRead = it } != -1) {
-                        output.write(buffer, 0, bytesRead)
-                        totalDownloaded += bytesRead
-                        if (totalBytes > 0) {
-                            val progress = totalDownloaded.toFloat() / totalBytes.toFloat()
-                            withContext(Dispatchers.Main) {
-                                onProgress(progress.coerceIn(0f, 1f))
-                            }
+            connection.inputStream.use { input ->
+                file.outputStream().use { output ->
+                    val buffer = ByteArray(BUFFER_SIZE)
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read == -1) break
+                        output.write(buffer, 0, read)
+                        digest.update(buffer, 0, read)
+                        downloaded += read
+                        val percent = if (total > 0) (downloaded * 100 / total).toInt() else 0
+                        if (percent != lastPercent) {
+                            lastPercent = percent
+                            withContext(Dispatchers.Main) { onProgress((percent / 100f).coerceIn(0f, 1f)) }
                         }
                     }
                 }
             }
 
-            withContext(Dispatchers.Main) {
-                onProgress(1f)
+            if (update.apkSize > 0 && downloaded != update.apkSize) {
+                file.delete()
+                return@withContext DownloadResult.Failure("Download incompleto. Verifique sua conexão e tente novamente.")
             }
-            apkFile
-        }.getOrNull()
+            val hash = digest.digest().joinToString("") { "%02x".format(it) }
+            if (update.sha256 != null && !hash.equals(update.sha256, ignoreCase = true)) {
+                file.delete()
+                return@withContext DownloadResult.Failure("O arquivo baixado está corrompido. Tente novamente.")
+            }
+            prefs.edit { putString(KEY_DOWNLOADED_VERSION, update.latestVersion) }
+            DownloadResult.Success(file)
+        } catch (e: Exception) {
+            file.delete()
+            DownloadResult.Failure("Falha ao baixar a atualização. Verifique sua conexão.")
+        }
+    }
+
+    fun canInstallPackages(): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.O || context.packageManager.canRequestPackageInstalls()
+
+    fun openInstallPermissionSettings() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        context.startActivity(
+            Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
     }
 
     fun installApk(file: File) {
         if (!file.exists()) return
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (!context.packageManager.canRequestPackageInstalls()) {
-                val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                    data = Uri.parse("package:${context.packageName}")
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(intent)
-                return
-            }
-        }
-
-        val apkUri = FileProvider.getUriForFile(
-            context,
-            "${context.packageName}.fileprovider",
-            file
+        val apkUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        context.startActivity(
+            Intent(Intent.ACTION_VIEW)
+                .setDataAndType(apkUri, "application/vnd.android.package-archive")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         )
+    }
 
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(apkUri, "application/vnd.android.package-archive")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    private fun open(url: String): HttpURLConnection =
+        (URL(url).openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            instanceFollowRedirects = true
+            setRequestProperty("User-Agent", "TerriFlow-App")
+            connectTimeout = CONNECT_TIMEOUT_MS
+            readTimeout = READ_TIMEOUT_MS
         }
 
-        context.startActivity(intent)
+    private fun followRedirects(initial: HttpURLConnection): HttpURLConnection {
+        var connection = initial
+        repeat(MAX_REDIRECTS) {
+            if (connection.responseCode !in REDIRECT_CODES) return connection
+            val location = connection.getHeaderField("Location") ?: return connection
+            connection.disconnect()
+            connection = open(URL(connection.url, location).toString())
+        }
+        return connection
+    }
+
+    private companion object {
+        const val RELEASES_API_URL = "https://api.github.com/repos/MRaphaelpy/TerriFlow/releases/latest"
+        const val APK_NAME = "terriflow-update.apk"
+        const val KEY_SNOOZED_VERSION = "dismissed_version"
+        const val KEY_SNOOZED_UNTIL = "snoozed_until"
+        const val KEY_DOWNLOADED_VERSION = "downloaded_version"
+        const val SNOOZE_HOURS = 24L
+        const val CONNECT_TIMEOUT_MS = 15_000
+        const val READ_TIMEOUT_MS = 30_000
+        const val BUFFER_SIZE = 64 * 1024
+        const val MAX_REDIRECTS = 5
+        val REDIRECT_CODES = setOf(301, 302, 303, 307, 308)
     }
 }
