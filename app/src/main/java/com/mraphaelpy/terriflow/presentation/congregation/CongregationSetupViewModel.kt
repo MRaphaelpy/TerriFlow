@@ -3,6 +3,7 @@ package com.mraphaelpy.terriflow.presentation.congregation
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mraphaelpy.terriflow.domain.model.Congregation
+import com.mraphaelpy.terriflow.domain.repository.AuthRepository
 import com.mraphaelpy.terriflow.domain.usecase.congregation.CreateCongregationUseCase
 import com.mraphaelpy.terriflow.domain.usecase.congregation.JoinCongregationUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -23,7 +24,8 @@ data class CongregationSetupUiState(
 @HiltViewModel
 class CongregationSetupViewModel @Inject constructor(
     private val createCongregation: CreateCongregationUseCase,
-    private val joinCongregation: JoinCongregationUseCase
+    private val joinCongregation: JoinCongregationUseCase,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(CongregationSetupUiState())
@@ -58,6 +60,17 @@ class CongregationSetupViewModel @Inject constructor(
                 .onFailure { e ->
                     _uiState.update { it.copy(isLoading = false, error = e.message ?: "Código inválido") }
                 }
+        }
+    }
+
+    fun clearError() {
+        _uiState.update { it.copy(error = null) }
+    }
+
+    fun logout(onDone: () -> Unit) {
+        viewModelScope.launch {
+            runCatching { authRepository.logout() }
+            onDone()
         }
     }
 }

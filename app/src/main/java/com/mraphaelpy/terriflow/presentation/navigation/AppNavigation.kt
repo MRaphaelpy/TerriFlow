@@ -157,6 +157,11 @@ fun AppNavigation(
                     navController.navigate(Screen.Dashboard.route) {
                         popUpTo(Screen.CongregationSetup.route) { inclusive = true }
                     }
+                },
+                onLogout = {
+                    navController.navigate(Screen.Login.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
                 }
             )
         }
