@@ -40,6 +40,14 @@
       ]
     },
     {
+      "collectionGroup": "events",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "congregationId", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "notifications",
       "queryScope": "COLLECTION",
       "fields": [

@@ -6,6 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.mraphaelpy.terriflow.data.local.entity.TerritoryEntity
 import kotlinx.coroutines.flow.Flow
+import java.util.Date
 
 @Dao
 interface TerritoryDao {
@@ -21,9 +22,6 @@ interface TerritoryDao {
 
     @Query("SELECT * FROM territories WHERE code = :code AND deletedAt IS NULL LIMIT 1")
     suspend fun getByCode(code: String): TerritoryEntity?
-
-    @Query("SELECT * FROM territories WHERE currentResponsibleId = :userId AND deletedAt IS NULL ORDER BY assignedAt DESC")
-    fun observeByResponsible(userId: String): Flow<List<TerritoryEntity>>
 
     @Query("SELECT * FROM territories WHERE status = :status AND deletedAt IS NULL ORDER BY code ASC")
     fun observeByStatus(status: String): Flow<List<TerritoryEntity>>
@@ -69,17 +67,14 @@ interface TerritoryDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(territories: List<TerritoryEntity>)
 
-    @Query("UPDATE territories SET synced = 1, syncVersion = :version WHERE id = :id")
-    suspend fun markSynced(id: String, version: Long)
-
-    @Query("UPDATE territories SET deletedAt = :deletedAt WHERE id = :id")
-    suspend fun softDelete(id: String, deletedAt: Long)
+    @Query("UPDATE territories SET synced = 1, syncVersion = :version WHERE id = :id AND updatedAt = :updatedAt")
+    suspend fun markSyncedIfUnchanged(id: String, version: Long, updatedAt: Date)
 
     @Query("SELECT COUNT(*) FROM territories WHERE status = :status AND deletedAt IS NULL")
     fun countByStatus(status: String): Flow<Int>
 
-    @Query("SELECT COUNT(*) FROM territories WHERE deletedAt IS NULL")
-    fun countAll(): Flow<Int>
+    @Query("SELECT code FROM territories WHERE deletedAt IS NULL")
+    suspend fun getAllCodes(): List<String>
 
     @Query("UPDATE territories SET currentResponsibleName = :newName WHERE currentResponsibleId = :userId")
     suspend fun updateResponsibleName(userId: String, newName: String)

@@ -1,17 +1,32 @@
 package com.mraphaelpy.terriflow.data.repository
 
+import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
+import com.google.firebase.auth.FirebaseAuthUserCollisionException
+import com.google.firebase.auth.FirebaseAuthWeakPasswordException
+import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.messaging.FirebaseMessaging
 import com.mraphaelpy.terriflow.data.local.AppDatabase
+import com.mraphaelpy.terriflow.data.local.dao.TerritoryDao
 import com.mraphaelpy.terriflow.data.local.dao.UserDao
 import com.mraphaelpy.terriflow.data.local.entity.UserEntity
 import com.mraphaelpy.terriflow.data.remote.source.FirestoreUserSource
+import com.mraphaelpy.terriflow.domain.model.AuthException
 import com.mraphaelpy.terriflow.domain.model.User
 import com.mraphaelpy.terriflow.domain.model.UserRole
 import com.mraphaelpy.terriflow.domain.repository.AuthRepository
 import com.mraphaelpy.terriflow.domain.repository.CongregationRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
@@ -22,7 +37,9 @@ import javax.inject.Singleton
 @Singleton
 class AuthRepositoryImpl @Inject constructor(
     private val auth: FirebaseAuth,
+    private val messaging: FirebaseMessaging,
     private val userDao: UserDao,
+    private val territoryDao: TerritoryDao,
     private val remoteSource: FirestoreUserSource,
     private val congregationRepository: CongregationRepository,
     private val appDatabase: AppDatabase
@@ -34,107 +51,76 @@ class AuthRepositoryImpl @Inject constructor(
     override val isLoggedIn: Boolean
         get() = auth.currentUser != null
 
-    override fun observeCurrentUser(): Flow<User?> {
-        val uid = currentUserId ?: return kotlinx.coroutines.flow.flowOf(null)
-        return userDao.observeById(uid).map { it?.toDomain() }
-    }
+    override fun observeCurrentUserId(): Flow<String?> = callbackFlow {
+        val listener = FirebaseAuth.AuthStateListener { trySend(it.currentUser?.uid) }
+        auth.addAuthStateListener(listener)
+        awaitClose { auth.removeAuthStateListener(listener) }
+    }.distinctUntilChanged()
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    override fun observeCurrentUser(): Flow<User?> =
+        observeCurrentUserId().flatMapLatest { uid ->
+            if (uid == null) flowOf(null) else userDao.observeById(uid).map { it?.toDomain() }
+        }
 
     override suspend fun getCurrentUser(): User? {
         val uid = currentUserId ?: return null
+        userDao.getById(uid)?.let { return it.toDomain() }
         val congregationId = congregationRepository.getCurrentCongregationId() ?: return null
-        return userDao.getById(uid)?.toDomain()
-            ?: remoteSource.getById(congregationId, uid)?.toDomain()
+        return runCatching { remoteSource.getById(congregationId, uid)?.toDomain() }.getOrNull()
     }
 
     override suspend fun login(email: String, password: String) {
-        auth.signInWithEmailAndPassword(email, password).await()
-        val uid = auth.currentUser?.uid ?: return
-        // Resolve congregation
-        val congregationId = resolveAndSaveCongregationId() ?: return
-        val remoteUser = remoteSource.getById(congregationId, uid)
-        if (remoteUser != null) {
-            userDao.upsert(UserEntity.fromDomain(remoteUser.toDomain(), synced = true))
-        }
+        mapAuthErrors { auth.signInWithEmailAndPassword(email, password).await() }
+        cacheRemoteProfile()
     }
 
     override suspend fun signInWithGoogle(idToken: String) {
-        val credential = com.google.firebase.auth.GoogleAuthProvider.getCredential(idToken, null)
-        val result = auth.signInWithCredential(credential).await()
-        val uid = result.user?.uid ?: return
-        val congregationId = resolveAndSaveCongregationId()
-        if (congregationId != null) {
-            val remoteUser = remoteSource.getById(congregationId, uid)
-            if (remoteUser != null) {
-                userDao.upsert(UserEntity.fromDomain(remoteUser.toDomain(), synced = true))
-                return
-            }
-        }
-        // New Google user without congregation — will be directed to join/create flow
-        val user = User(
-            id = uid,
-            name = result.user?.displayName ?: "Usuário Google",
-            email = result.user?.email ?: "",
-            role = UserRole.RESPONSIBLE,
-            createdAt = Date(),
-            active = true,
-            photoUrl = result.user?.photoUrl?.toString()
+        val credential = GoogleAuthProvider.getCredential(idToken, null)
+        val firebaseUser = mapAuthErrors { auth.signInWithCredential(credential).await() }.user ?: return
+        if (cacheRemoteProfile()) return
+
+        // Usuário Google sem congregação: guarda um perfil local até ele criar/entrar em uma
+        saveLocalProfile(
+            User(
+                id = firebaseUser.uid,
+                name = firebaseUser.displayName ?: "Usuário Google",
+                email = firebaseUser.email ?: "",
+                photoUrl = firebaseUser.photoUrl?.toString()
+            )
         )
-        userDao.upsert(UserEntity.fromDomain(user, synced = true))
     }
 
     override suspend fun register(name: String, email: String, password: String) {
-        val result = auth.createUserWithEmailAndPassword(email, password).await()
+        val result = mapAuthErrors { auth.createUserWithEmailAndPassword(email, password).await() }
         val uid = result.user?.uid ?: return
-        val user = User(
-            id = uid,
-            name = name,
-            email = email,
-            role = UserRole.RESPONSIBLE,
-            createdAt = Date(),
-            active = true
-        )
-        userDao.upsert(UserEntity.fromDomain(user, synced = true))
-    }
-
-    override suspend fun registerWithCongregation(name: String, email: String, password: String, congregationId: String) {
-        val result = auth.createUserWithEmailAndPassword(email, password).await()
-        val uid = result.user?.uid ?: return
-        val user = User(
-            id = uid,
-            name = name,
-            email = email,
-            role = UserRole.RESPONSIBLE,
-            createdAt = Date(),
-            active = true,
-            congregationId = congregationId
-        )
-        remoteSource.upsert(congregationId, user)
-        userDao.upsert(UserEntity.fromDomain(user, synced = true))
-        congregationRepository.saveCongregationIdLocally(congregationId)
+        runCatching {
+            val request = UserProfileChangeRequest.Builder().setDisplayName(name).build()
+            result.user?.updateProfile(request)?.await()
+        }
+        saveLocalProfile(User(id = uid, name = name, email = email))
     }
 
     override suspend fun logout() {
-        val uid = currentUserId
-        if (uid != null) {
+        currentUserId?.let { uid ->
             runCatching {
-                val token = FirebaseMessaging.getInstance().token.await()
+                val token = messaging.token.await()
                 val congregationId = congregationRepository.getCurrentCongregationId()
-                if (congregationId != null) {
-                    remoteSource.removeFcmToken(congregationId, uid, token)
-                }
+                if (congregationId != null) remoteSource.removeFcmToken(congregationId, uid, token)
             }
         }
         congregationRepository.clearCongregationId()
-        runCatching {
-            withContext(Dispatchers.IO) {
-                appDatabase.clearAllTables()
-            }
-        }
+        runCatching { withContext(Dispatchers.IO) { appDatabase.clearAllTables() } }
         auth.signOut()
     }
 
     override suspend fun sendPasswordReset(email: String) {
-        auth.sendPasswordResetEmail(email).await()
+        mapAuthErrors { auth.sendPasswordResetEmail(email).await() }
+    }
+
+    override suspend fun registerDeviceToken() {
+        if (!isLoggedIn) return
+        updateFcmToken(messaging.token.await())
     }
 
     override suspend fun updateFcmToken(token: String) {
@@ -144,45 +130,78 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     override suspend fun updatePhotoUrl(photoUrl: String) {
-        val uid = currentUserId ?: return
-        val user = getCurrentUser() ?: return
-        val congregationId = congregationRepository.getCurrentCongregationId() ?: return
-        val updatedUser = user.copy(photoUrl = photoUrl)
-        remoteSource.upsert(congregationId, updatedUser)
-        userDao.upsert(UserEntity.fromDomain(updatedUser, synced = true))
+        updateProfile { it.copy(photoUrl = photoUrl) }
     }
 
     override suspend fun updateName(name: String) {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return
-        val uid = currentUserId ?: return
-        val user = getCurrentUser() ?: return
-        val congregationId = congregationRepository.getCurrentCongregationId() ?: return
-
         runCatching {
-            val req = com.google.firebase.auth.UserProfileChangeRequest.Builder()
-                .setDisplayName(trimmed)
-                .build()
-            auth.currentUser?.updateProfile(req)?.await()
+            val request = UserProfileChangeRequest.Builder().setDisplayName(trimmed).build()
+            auth.currentUser?.updateProfile(request)?.await()
         }
-
-        val updatedUser = user.copy(name = trimmed)
-        remoteSource.upsert(congregationId, updatedUser)
-        userDao.upsert(UserEntity.fromDomain(updatedUser, synced = true))
-        appDatabase.territoryDao().updateResponsibleName(uid, trimmed)
+        val updated = updateProfile { it.copy(name = trimmed) } ?: return
+        territoryDao.updateResponsibleName(updated.id, trimmed)
     }
 
-    override suspend fun resolveAndSaveCongregationId(): String? {
-        val uid = currentUserId ?: return null
-        // Check local cache first
-        val cached = congregationRepository.getCurrentCongregationId()
-        if (!cached.isNullOrEmpty()) return cached
-        // Fetch from global users pointer
-        val fromRemote = remoteSource.getCongregationIdForUser(uid)
-        if (!fromRemote.isNullOrEmpty()) {
-            congregationRepository.saveCongregationIdLocally(fromRemote)
-            return fromRemote
-        }
-        return null
+    override suspend fun resolveAndSaveCongregationId(): String? =
+        if (isLoggedIn) congregationRepository.getCurrentCongregationId() else null
+
+    override suspend fun ensureCongregationProfile(congregationId: String, roleIfNew: UserRole): User {
+        val firebaseUser = auth.currentUser ?: throw AuthException.UserNotFound()
+        val existing = remoteSource.getById(congregationId, firebaseUser.uid)?.toDomain()
+        val profile = existing?.copy(congregationId = congregationId)
+            ?: (userDao.getById(firebaseUser.uid)?.toDomain() ?: User(
+                id = firebaseUser.uid,
+                name = firebaseUser.displayName.orEmpty().ifBlank { firebaseUser.email.orEmpty() },
+                email = firebaseUser.email.orEmpty(),
+                photoUrl = firebaseUser.photoUrl?.toString()
+            )).copy(
+                role = roleIfNew,
+                active = true,
+                createdAt = Date(),
+                congregationId = congregationId
+            )
+
+        remoteSource.upsert(congregationId, profile)
+        saveLocalProfile(profile)
+        return profile
+    }
+
+    /** Busca o perfil remoto do usuário logado e guarda no Room. Retorna se encontrou. */
+    private suspend fun cacheRemoteProfile(): Boolean {
+        val uid = currentUserId ?: return false
+        val congregationId = resolveAndSaveCongregationId() ?: return false
+        val remoteUser = remoteSource.getById(congregationId, uid) ?: return false
+        saveLocalProfile(remoteUser.toDomain())
+        return true
+    }
+
+    private suspend fun updateProfile(transform: (User) -> User): User? {
+        val user = getCurrentUser() ?: return null
+        val congregationId = congregationRepository.getCurrentCongregationId() ?: return null
+        val updated = transform(user)
+        remoteSource.upsert(congregationId, updated)
+        saveLocalProfile(updated)
+        return updated
+    }
+
+    private suspend fun saveLocalProfile(user: User) {
+        userDao.upsert(UserEntity.fromDomain(user, synced = true))
+    }
+
+    private inline fun <T> mapAuthErrors(block: () -> T): T = try {
+        block()
+    } catch (e: FirebaseAuthWeakPasswordException) {
+        throw AuthException.WeakPassword(e)
+    } catch (e: FirebaseAuthUserCollisionException) {
+        throw AuthException.EmailAlreadyInUse(e)
+    } catch (e: FirebaseAuthInvalidUserException) {
+        throw AuthException.UserNotFound(e)
+    } catch (e: FirebaseAuthInvalidCredentialsException) {
+        if (e.errorCode == "ERROR_INVALID_EMAIL") throw AuthException.InvalidEmail(e)
+        throw AuthException.InvalidCredentials(e)
+    } catch (e: FirebaseNetworkException) {
+        throw AuthException.Network(e)
     }
 }

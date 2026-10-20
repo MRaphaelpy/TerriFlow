@@ -1,17 +1,15 @@
 package com.mraphaelpy.terriflow.data.repository
 
-import com.google.firebase.firestore.FirebaseFirestore
+import android.util.Log
 import com.mraphaelpy.terriflow.data.local.dao.TerritoryDao
 import com.mraphaelpy.terriflow.data.local.dao.UserDao
 import com.mraphaelpy.terriflow.data.local.entity.UserEntity
-import com.mraphaelpy.terriflow.data.remote.dto.UserDto
 import com.mraphaelpy.terriflow.data.remote.source.FirestoreUserSource
 import com.mraphaelpy.terriflow.domain.model.User
 import com.mraphaelpy.terriflow.domain.repository.CongregationRepository
 import com.mraphaelpy.terriflow.domain.repository.UserRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -20,7 +18,6 @@ class UserRepositoryImpl @Inject constructor(
     private val userDao: UserDao,
     private val territoryDao: TerritoryDao,
     private val remoteSource: FirestoreUserSource,
-    private val firestore: FirebaseFirestore,
     private val congregationRepository: CongregationRepository
 ) : UserRepository {
 
@@ -36,34 +33,31 @@ class UserRepositoryImpl @Inject constructor(
     override suspend fun getById(id: String): User? =
         userDao.getById(id)?.toDomain()
 
+    /** Grava no servidor e no Room. Lança exceção se o servidor recusar (ex.: sem permissão). */
     override suspend fun save(user: User) {
-        userDao.upsert(UserEntity.fromDomain(user, synced = false))
+        val congregationId = congregationRepository.getCurrentCongregationId()
+        if (congregationId != null) remoteSource.upsert(congregationId, user)
+        userDao.upsert(UserEntity.fromDomain(user, synced = congregationId != null))
         territoryDao.updateResponsibleName(user.id, user.name)
-        val congregationId = congregationRepository.getCurrentCongregationId() ?: return
-        runCatching { remoteSource.upsert(congregationId, user) }
-            .onSuccess { userDao.markSynced(user.id) }
     }
 
     override suspend fun updateUserName(userId: String, newName: String) {
         val trimmed = newName.trim()
         if (trimmed.isEmpty()) return
         val current = getById(userId) ?: return
-        val updated = current.copy(name = trimmed)
-        save(updated)
+        save(current.copy(name = trimmed))
     }
 
     override suspend fun syncFromRemote() {
         val congregationId = congregationRepository.getCurrentCongregationId() ?: return
         runCatching {
-            val snapshot = firestore
-                .collection("congregations").document(congregationId)
-                .collection("users")
-                .whereEqualTo("active", true)
-                .get().await()
-            val entities = snapshot.documents
-                .mapNotNull { UserDto.fromDocument(it) }
-                .map { UserEntity.fromDomain(it.toDomain(), synced = true) }
-            userDao.upsertAll(entities)
-        }
+            userDao.upsertAll(
+                remoteSource.getAll(congregationId).map { UserEntity.fromDomain(it.toDomain(), synced = true) }
+            )
+        }.onFailure { Log.e(TAG, "Erro ao sincronizar usuários", it) }
+    }
+
+    private companion object {
+        const val TAG = "UserRepository"
     }
 }

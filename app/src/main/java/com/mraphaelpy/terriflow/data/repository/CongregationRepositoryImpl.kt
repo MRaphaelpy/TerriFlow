@@ -2,11 +2,15 @@ package com.mraphaelpy.terriflow.data.repository
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
+import com.google.firebase.auth.FirebaseAuth
 import com.mraphaelpy.terriflow.data.remote.source.FirestoreCongregationSource
 import com.mraphaelpy.terriflow.data.remote.source.FirestoreUserSource
 import com.mraphaelpy.terriflow.domain.model.Congregation
+import com.mraphaelpy.terriflow.domain.model.DomainException
 import com.mraphaelpy.terriflow.domain.repository.CongregationRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.text.Normalizer
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -14,68 +18,45 @@ import javax.inject.Singleton
 @Singleton
 class CongregationRepositoryImpl @Inject constructor(
     @ApplicationContext context: Context,
+    private val auth: FirebaseAuth,
     private val congregationSource: FirestoreCongregationSource,
     private val userSource: FirestoreUserSource
 ) : CongregationRepository {
 
     private val prefs: SharedPreferences =
-        context.getSharedPreferences("terriflow_congregation", Context.MODE_PRIVATE)
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     override suspend fun getCurrentCongregationId(): String? {
-        val cached = prefs.getString("congregation_id", null)
-        if (!cached.isNullOrEmpty()) return cached
+        prefs.getString(KEY_CONGREGATION_ID, null)?.takeIf { it.isNotEmpty() }?.let { return it }
 
-        // Fallback: se o cache local estiver vazio (ex: dados limpos ou login prévio),
+        // Cache local vazio (dados limpos ou primeiro login neste aparelho):
         // busca no documento global do usuário no Firestore
-        val uid = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid ?: return null
+        val uid = auth.currentUser?.uid ?: return null
         val remoteId = runCatching { userSource.getCongregationIdForUser(uid) }.getOrNull()
-        if (!remoteId.isNullOrEmpty()) {
-            saveCongregationIdLocally(remoteId)
-            return remoteId
-        }
-        return null
+        if (remoteId.isNullOrEmpty()) return null
+        saveCongregationIdLocally(remoteId)
+        return remoteId
     }
 
     override suspend fun saveCongregationIdLocally(id: String) {
-        prefs.edit().putString("congregation_id", id).apply()
+        prefs.edit { putString(KEY_CONGREGATION_ID, id) }
     }
 
     override suspend fun clearCongregationId() {
-        prefs.edit().remove("congregation_id").apply()
+        prefs.edit { remove(KEY_CONGREGATION_ID) }
     }
 
     override suspend fun create(name: String, adminUserId: String): Congregation {
-        // Bloqueia criação duplicada — verifica localmente e no Firestore
-        val existingLocal = getCurrentCongregationId()
-        if (!existingLocal.isNullOrEmpty()) {
-            val existing = congregationSource.getById(existingLocal)
-            if (existing != null) {
-                throw IllegalStateException(
-                    "Você já pertence à congregação \"${existing.name}\". " +
-                    "Não é possível criar outra."
-                )
-            }
-        }
-        val existingRemote = userSource.getCongregationIdForUser(adminUserId)
-        if (!existingRemote.isNullOrEmpty()) {
-            val existing = congregationSource.getById(existingRemote)
-            if (existing != null) {
-                // Sincroniza localmente e rejeita
-                saveCongregationIdLocally(existingRemote)
-                throw IllegalStateException(
-                    "Você já pertence à congregação \"${existing.name}\". " +
-                    "Não é possível criar outra."
-                )
-            }
-        }
+        getCurrentCongregationId()
+            ?.let { congregationSource.getById(it) }
+            ?.let { throw DomainException.AlreadyInCongregation(it.name) }
 
-        val code = generateCode(name)
         val congregation = Congregation(
             id = UUID.randomUUID().toString(),
             name = name,
-            code = code
+            code = generateCode(name)
         )
-        congregationSource.create(congregation)
+        congregationSource.create(congregation, createdBy = adminUserId)
         userSource.saveGlobalPointer(adminUserId, congregation.id)
         saveCongregationIdLocally(congregation.id)
         return congregation
@@ -83,7 +64,7 @@ class CongregationRepositoryImpl @Inject constructor(
 
     override suspend fun joinByCode(code: String, userId: String): Congregation {
         val congregation = congregationSource.findByCode(code)
-            ?: throw IllegalArgumentException("Código de congregação inválido: $code")
+            ?: throw DomainException.InvalidCongregationCode(code)
         userSource.saveGlobalPointer(userId, congregation.id)
         saveCongregationIdLocally(congregation.id)
         return congregation
@@ -93,12 +74,21 @@ class CongregationRepositoryImpl @Inject constructor(
         congregationSource.getById(id)
 
     private fun generateCode(name: String): String {
-        val base = name.uppercase()
+        // Remove acentos antes de filtrar, para "São José" virar "SAO-JOSE" e não "SO-JOS"
+        val base = Normalizer.normalize(name, Normalizer.Form.NFD)
+            .replace(Regex("\\p{M}"), "")
+            .uppercase()
             .replace(Regex("[^A-Z0-9 ]"), "")
             .trim()
-            .replace(" ", "-")
+            .replace(Regex("\\s+"), "-")
             .take(10)
+            .trimEnd('-')
         val suffix = (1000..9999).random()
-        return "$base-$suffix"
+        return if (base.isEmpty()) "CONG-$suffix" else "$base-$suffix"
+    }
+
+    private companion object {
+        const val PREFS_NAME = "terriflow_congregation"
+        const val KEY_CONGREGATION_ID = "congregation_id"
     }
 }

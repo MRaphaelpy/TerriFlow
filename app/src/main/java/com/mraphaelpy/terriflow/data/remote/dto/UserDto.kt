@@ -28,6 +28,11 @@ data class UserDto(
         congregationId = congregationId
     )
 
+    /**
+     * Campos do perfil. `fcmTokens` fica de fora de propósito: os tokens são
+     * mantidos apenas via arrayUnion/arrayRemove, senão um admin editando outro
+     * usuário sobrescreveria os tokens com a cópia local (possivelmente vazia).
+     */
     fun toMap() = mapOf(
         "name" to name,
         "email" to email,
@@ -35,7 +40,6 @@ data class UserDto(
         "createdAt" to createdAt,
         "active" to active,
         "photoUrl" to photoUrl,
-        "fcmTokens" to fcmTokens,
         "congregationId" to congregationId
     )
 

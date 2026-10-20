@@ -39,7 +39,6 @@ data class TerritoryEventDto(
     companion object {
         fun fromDocument(doc: DocumentSnapshot): TerritoryEventDto? {
             if (!doc.exists()) return null
-            @Suppress("UNCHECKED_CAST")
             return TerritoryEventDto(
                 id = doc.id,
                 territoryId = doc.getString("territoryId") ?: "",
@@ -47,7 +46,10 @@ data class TerritoryEventDto(
                 userName = doc.getString("userName") ?: "",
                 type = doc.getString("type") ?: "",
                 timestamp = doc.getTimestamp("timestamp") ?: Timestamp.now(),
-                extra = (doc.get("extra") as? Map<String, String>) ?: emptyMap(),
+                extra = (doc.get("extra") as? Map<*, *>)
+                    ?.entries
+                    ?.associate { (key, value) -> key.toString() to value?.toString().orEmpty() }
+                    ?: emptyMap(),
                 congregationId = doc.getString("congregationId") ?: ""
             )
         }

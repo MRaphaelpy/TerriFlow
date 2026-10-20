@@ -1,103 +1,90 @@
 package com.mraphaelpy.terriflow.sync
 
+import android.util.Log
 import com.mraphaelpy.terriflow.data.local.dao.NotificationDao
-import com.mraphaelpy.terriflow.data.local.dao.TerritoryDao
 import com.mraphaelpy.terriflow.data.local.dao.TerritoryEventDao
 import com.mraphaelpy.terriflow.data.local.entity.NotificationEntity
-import com.mraphaelpy.terriflow.data.local.entity.TerritoryEntity
 import com.mraphaelpy.terriflow.data.local.entity.TerritoryEventEntity
 import com.mraphaelpy.terriflow.data.remote.source.FirestoreEventSource
 import com.mraphaelpy.terriflow.data.remote.source.FirestoreNotificationSource
 import com.mraphaelpy.terriflow.data.remote.source.FirestoreTerritorySource
+import com.mraphaelpy.terriflow.data.sync.TerritoryRemoteMerger
+import com.mraphaelpy.terriflow.di.ApplicationScope
 import com.mraphaelpy.terriflow.domain.repository.AuthRepository
 import com.mraphaelpy.terriflow.domain.repository.CongregationRepository
-import com.mraphaelpy.terriflow.notification.LocalNotificationHelper
+import com.mraphaelpy.terriflow.domain.service.SystemNotifier
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.supervisorScope
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Mantém o Room atualizado com os listeners do Firestore enquanto houver um
+ * usuário logado. Os listeners são reiniciados a cada login/logout.
+ */
 @Singleton
 class RealtimeSyncManager @Inject constructor(
     private val authRepository: AuthRepository,
     private val congregationRepository: CongregationRepository,
-    private val territoryDao: TerritoryDao,
+    private val territoryMerger: TerritoryRemoteMerger,
     private val notificationDao: NotificationDao,
     private val eventDao: TerritoryEventDao,
-    private val localNotificationHelper: LocalNotificationHelper,
+    private val systemNotifier: SystemNotifier,
     private val territoryRemoteSource: FirestoreTerritorySource,
     private val notificationRemoteSource: FirestoreNotificationSource,
-    private val eventRemoteSource: FirestoreEventSource
+    private val eventRemoteSource: FirestoreEventSource,
+    @ApplicationScope private val scope: CoroutineScope
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
     fun start() {
         scope.launch {
-            authRepository.observeCurrentUser().collectLatest { user ->
-                if (user == null) return@collectLatest
+            authRepository.observeCurrentUserId().collectLatest { uid ->
+                if (uid == null) return@collectLatest
+                val congregationId = congregationRepository.getCurrentCongregationId() ?: return@collectLatest
 
-                val congregationId = congregationRepository.getCurrentCongregationId()
-                    ?: return@collectLatest
-
-                val territoryFlow = territoryRemoteSource.observeAll(congregationId)
-
-                supervisorScope {
-                    launch {
-                        runCatching {
-                            territoryFlow.collect { dtos ->
-                                dtos.forEach { dto ->
-                                    val local = territoryDao.getById(dto.id)
-                                    when {
-                                        local == null -> territoryDao.upsert(
-                                            TerritoryEntity.fromDomain(dto.toDomain(), synced = true)
-                                                .copy(syncVersion = dto.syncVersion)
-                                        )
-                                        !local.synced -> Unit
-                                        dto.syncVersion >= local.syncVersion -> territoryDao.upsert(
-                                            TerritoryEntity.fromDomain(dto.toDomain(), synced = true)
-                                                .copy(syncVersion = dto.syncVersion)
-                                        )
-                                        else -> Unit
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    launch {
-                        runCatching {
-                            notificationRemoteSource.observeByUser(congregationId, user.id).collect { notifications ->
-                                notifications.forEach { notification ->
-                                    val existing = notificationDao.getById(notification.id)
-                                    if (existing == null) {
-                                        notificationDao.insert(NotificationEntity.fromDomain(notification))
-                                        localNotificationHelper.showLocalNotification(
-                                            notification.title,
-                                            notification.body,
-                                            notification.territoryId
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    launch {
-                        runCatching {
-                            eventRemoteSource.observeRecentGlobal(congregationId, 50).collect { dtos ->
-                                val entities = dtos.map {
-                                    TerritoryEventEntity.fromDomain(it.toDomain(), synced = true)
-                                }
-                                eventDao.insertAll(entities)
-                            }
-                        }
-                    }
-                }
+                launch { syncTerritories(congregationId) }
+                launch { syncNotifications(congregationId, uid) }
+                launch { syncRecentEvents(congregationId) }
             }
         }
+    }
+
+    private suspend fun syncTerritories(congregationId: String) {
+        territoryRemoteSource.observeAll(congregationId).collectSafely("territórios") { snapshot ->
+            territoryMerger.merge(snapshot.territories, removeMissing = !snapshot.isFromCache)
+        }
+    }
+
+    private suspend fun syncNotifications(congregationId: String, userId: String) {
+        var isFirstSnapshot = true
+        notificationRemoteSource.observeForUser(congregationId, userId).collectSafely("notificações") { notifications ->
+            notifications.forEach { notification ->
+                if (notificationDao.getById(notification.id) != null) return@forEach
+                notificationDao.insert(NotificationEntity.fromDomain(notification))
+                // O primeiro snapshot traz o histórico (ex.: após reinstalar): só exibe as novas
+                if (!isFirstSnapshot && !notification.isBroadcast && notification.userId == userId) {
+                    systemNotifier.show(notification.title, notification.body, notification.territoryId)
+                }
+            }
+            isFirstSnapshot = false
+        }
+    }
+
+    private suspend fun syncRecentEvents(congregationId: String) {
+        eventRemoteSource.observeRecent(congregationId).collectSafely("eventos") { dtos ->
+            eventDao.insertAll(dtos.map { TerritoryEventEntity.fromDomain(it.toDomain(), synced = true) })
+        }
+    }
+
+    private suspend fun <T> Flow<T>.collectSafely(name: String, action: suspend (T) -> Unit) {
+        catch { Log.e(TAG, "Listener de $name encerrado", it) }.collect { value ->
+            runCatching { action(value) }.onFailure { Log.e(TAG, "Erro ao aplicar $name", it) }
+        }
+    }
+
+    private companion object {
+        const val TAG = "RealtimeSyncManager"
     }
 }
