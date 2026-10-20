@@ -19,10 +19,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
-/**
- * Loading centralizado que ocupa toda a tela.
- * Substitui o padrão Box(fillMaxSize) { CircularProgressIndicator() } repetido em 7+ telas.
- */
 @Composable
 fun FullScreenLoading(modifier: Modifier = Modifier) {
     Box(
@@ -33,10 +29,6 @@ fun FullScreenLoading(modifier: Modifier = Modifier) {
     }
 }
 
-/**
- * Loading centralizado com mensagem de texto abaixo do indicador.
- * Usado em ImportKmlScreen para os estados "Lendo arquivo..." e "Importando territórios...".
- */
 @Composable
 fun FullScreenLoadingWithMessage(message: String, modifier: Modifier = Modifier) {
     Box(
@@ -57,15 +49,6 @@ fun FullScreenLoadingWithMessage(message: String, modifier: Modifier = Modifier)
     }
 }
 
-/**
- * Estado vazio ou de feedback centralizado na tela.
- *
- * @param icon Ícone visual de 64dp.
- * @param title Texto principal (obrigatório).
- * @param subtitle Texto secundário opcional abaixo do título.
- * @param iconTint Cor do ícone — use onSurfaceVariant para estados neutros, primary para sucesso.
- * @param action Composable opcional para botão de ação abaixo do texto.
- */
 @Composable
 fun EmptyState(
     icon: ImageVector,

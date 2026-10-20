@@ -23,11 +23,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
-/**
- * Dialog de confirmação genérico com botão de ação primária e cancelar.
- *
- * @param icon Ícone opcional exibido no topo do dialog.
- */
 @Composable
 fun ConfirmDialog(
     title: String,
@@ -59,10 +54,6 @@ fun ConfirmDialog(
     )
 }
 
-/**
- * Dialog para ações destrutivas irreversíveis (apagar, remover).
- * Botão de confirmação usa a cor de erro.
- */
 @Composable
 fun DestructiveDialog(
     title: String,
@@ -100,9 +91,6 @@ fun DestructiveDialog(
     )
 }
 
-/**
- * Dialog de carregamento sem botões. Não pode ser dispensado pelo usuário.
- */
 @Composable
 fun LoadingDialog(message: String) {
     AlertDialog(
@@ -141,9 +129,6 @@ fun LoadingDialog(message: String) {
     )
 }
 
-/**
- * Dialog de erro com ícone de erro, título fixo "Erro" e botão OK.
- */
 @Composable
 fun ErrorDialog(
     message: String,

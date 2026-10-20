@@ -17,14 +17,11 @@ class ImportTerritoriesUseCase @Inject constructor(
     private val territoryRepository: TerritoryRepository,
     private val eventRepository: TerritoryEventRepository
 ) {
-    /** Importa os territórios em sequência de código e retorna quantos foram salvos. */
     suspend operator fun invoke(items: List<ImportedTerritory>): Int {
         if (items.isEmpty()) return 0
         val actor = guard.requireCanCreate()
         val now = Date()
 
-        // Busca o próximo código uma única vez e incrementa localmente,
-        // evitando uma consulta remota (e possíveis códigos repetidos) por item.
         var nextNumber = TerritoryCode.numberOf(territoryRepository.getNextCode()) ?: 1
 
         items.forEach { imported ->

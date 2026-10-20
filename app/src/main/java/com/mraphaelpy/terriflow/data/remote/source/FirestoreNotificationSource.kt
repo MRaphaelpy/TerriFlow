@@ -25,7 +25,6 @@ class FirestoreNotificationSource @Inject constructor(
             .orderBy("createdAt", Query.Direction.DESCENDING)
             .limit(limit)
 
-    /** Notificações destinadas ao usuário, mais recentes primeiro. */
     fun observeForUser(congregationId: String, userId: String, limit: Long = 50): Flow<List<AppNotification>> =
         callbackFlow {
             val sub = recentForUser(congregationId, userId, limit)

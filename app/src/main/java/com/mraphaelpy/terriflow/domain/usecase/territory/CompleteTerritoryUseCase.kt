@@ -16,10 +16,6 @@ import com.mraphaelpy.terriflow.domain.usecase.notification.NotifyAdminsAndOwner
 import java.util.Date
 import javax.inject.Inject
 
-/**
- * Finaliza o território. Se [nextResponsibleId] for informado, o território é
- * transferido diretamente para o próximo responsável.
- */
 class CompleteTerritoryUseCase @Inject constructor(
     private val guard: TerritoryActionGuard,
     private val territoryRepository: TerritoryRepository,
@@ -37,13 +33,10 @@ class CompleteTerritoryUseCase @Inject constructor(
         val pastResponsibleIds =
             (territory.pastResponsibleIds + listOfNotNull(territory.currentResponsibleId)).distinct()
 
-        // Os eventos são gravados antes do território: as regras do Firestore só aceitam
-        // eventos de um não-admin enquanto ele ainda é o responsável atual.
         eventRepository.save(
             TerritoryEvent.create(territory.id, actor, EventType.COMPLETED, now)
         )
 
-        // Finalização (com ou sem transferência) é avisada aos admins e ao responsável
         notifyAdminsAndOwner(
             territory = territory,
             ownerId = territory.currentResponsibleId,

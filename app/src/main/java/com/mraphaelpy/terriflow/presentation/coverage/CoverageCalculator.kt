@@ -4,7 +4,6 @@ import com.mraphaelpy.terriflow.domain.model.EventType
 import com.mraphaelpy.terriflow.domain.model.Territory
 import com.mraphaelpy.terriflow.domain.model.TerritoryEvent
 
-/** Cálculos de cobertura, sem dependência de Android (testável isoladamente). */
 object CoverageCalculator {
 
     private const val HISTORY_PREVIEW_SIZE = 3
@@ -28,8 +27,6 @@ object CoverageCalculator {
             CoverageSortOption.NEVER_WORKED -> coverages.filter { it.lastCompletedDate == null }
             CoverageSortOption.OLDEST_COMPLETED_FIRST ->
                 coverages.sortedWith(compareBy(nullsFirst()) { it.lastCompletedDate })
-            // compareByDescending(nullsLast()) inverteria também os nulos, colocando
-            // territórios nunca trabalhados no topo
             CoverageSortOption.NEWEST_COMPLETED_FIRST ->
                 coverages.sortedWith(compareBy(nullsLast(reverseOrder())) { it.lastCompletedDate })
             CoverageSortOption.MOST_WORKED -> coverages.sortedByDescending { it.completionCount }

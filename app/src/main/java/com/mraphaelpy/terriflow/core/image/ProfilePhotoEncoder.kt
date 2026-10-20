@@ -12,10 +12,6 @@ import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Reduz a foto escolhida e a converte em data URI JPEG, pequena o bastante
- * para ser salva direto no documento do usuário no Firestore.
- */
 @Singleton
 class ProfilePhotoEncoder @Inject constructor(
     @ApplicationContext private val context: Context
@@ -32,7 +28,6 @@ class ProfilePhotoEncoder @Inject constructor(
         "data:image/jpeg;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
     }
 
-    /** Decodifica já reduzida para não carregar fotos de vários megapixels inteiras na memória. */
     private fun decodeSampled(uri: Uri): Bitmap? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }

@@ -15,13 +15,11 @@ class FirestoreUserSource @Inject constructor(
     private val firestore: FirebaseFirestore,
     private val auth: FirebaseAuth
 ) {
-    // Documento global /users/{uid}: guarda o congregationId para descobri-lo após o login
     private val globalUsersCollection = firestore.collection("users")
 
     private fun congregationUsersCollection(congregationId: String) =
         firestore.collection("congregations").document(congregationId).collection("users")
 
-    /** Todos os usuários da congregação, inclusive inativos (para que admins possam reativá-los). */
     suspend fun getAll(congregationId: String): List<UserDto> =
         congregationUsersCollection(congregationId).get().await().documents.mapNotNull(UserDto::fromDocument)
 
@@ -46,7 +44,6 @@ class FirestoreUserSource @Inject constructor(
             .document(user.id)
             .set(UserDto.fromDomain(user).toMap(), SetOptions.merge())
             .await()
-        // O ponteiro global só pode ser escrito pelo próprio usuário (regras do Firestore)
         if (auth.currentUser?.uid == user.id) {
             runCatching { saveGlobalPointer(user.id, congregationId) }
         }

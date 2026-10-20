@@ -36,7 +36,6 @@ class NotificationRepositoryImpl @Inject constructor(
         val userId = auth.currentUser?.uid ?: return
         val congregationId = congregationRepository.getCurrentCongregationId() ?: return
         runCatching {
-            // IGNORE preserva o estado de leitura das notificações já existentes
             val notifications = remoteSource.getRecentForUser(congregationId, userId)
             notificationDao.insertAll(notifications.map(NotificationEntity::fromDomain))
         }.onFailure {

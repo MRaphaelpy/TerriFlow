@@ -112,7 +112,6 @@ fun TerritoryListScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Search bar
             SearchBar(
                 query = uiState.filter.query,
                 onQueryChange = { viewModel.updateQuery(it) },
@@ -121,7 +120,6 @@ fun TerritoryListScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             )
 
-            // Status filters
             StatusFilterRow(
                 selectedStatus = uiState.filter.status,
                 onStatusSelected = { viewModel.updateStatusFilter(it) }
@@ -232,7 +230,6 @@ fun TerritoryListItem(territory: Territory, currentUserId: String?, onClick: () 
         ),
     ) {
         Column {
-            // Header colorido por status
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -273,7 +270,6 @@ fun TerritoryListItem(territory: Territory, currentUserId: String?, onClick: () 
                 }
             }
 
-            // Nome e localização
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -303,7 +299,6 @@ fun TerritoryListItem(territory: Territory, currentUserId: String?, onClick: () 
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-            // Rodapé: dirigente + data
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -346,4 +341,3 @@ fun TerritoryListItem(territory: Territory, currentUserId: String?, onClick: () 
         }
     }
 }
-

@@ -7,7 +7,6 @@ import com.mraphaelpy.terriflow.domain.repository.AuthRepository
 import com.mraphaelpy.terriflow.domain.repository.CongregationRepository
 import javax.inject.Inject
 
-/** Cria a congregação e torna o usuário logado seu Super Administrador. */
 class CreateCongregationUseCase @Inject constructor(
     private val congregationRepository: CongregationRepository,
     private val authRepository: AuthRepository

@@ -54,7 +54,6 @@ class LocalNotificationHelper @Inject constructor(
     }
 
     companion object {
-        /** Extra do Intent com o território a abrir quando a notificação é tocada. */
         const val EXTRA_TERRITORY_ID = "territoryId"
 
         private const val CHANNEL_ID = "terriflow_main"

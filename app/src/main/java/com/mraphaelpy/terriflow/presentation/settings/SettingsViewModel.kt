@@ -78,7 +78,6 @@ class SettingsViewModel @Inject constructor(
 
     private fun loadCongregation() {
         viewModelScope.launch {
-            // Sem conexão a consulta pode falhar; a tela apenas fica sem os dados da congregação
             val congregation = runCatching {
                 congregationRepository.getCurrentCongregationId()?.let { congregationRepository.getById(it) }
             }.getOrNull()

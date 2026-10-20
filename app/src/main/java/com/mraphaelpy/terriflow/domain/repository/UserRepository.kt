@@ -9,7 +9,6 @@ interface UserRepository {
     fun observeResponsibles(): Flow<List<User>>
     suspend fun getById(id: String): User?
 
-    /** Administradores ativos da congregação (ADMIN e SUPER_ADMIN). */
     suspend fun getActiveAdmins(): List<User>
     suspend fun save(user: User)
     suspend fun updateUserName(userId: String, newName: String)

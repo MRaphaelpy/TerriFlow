@@ -60,7 +60,6 @@ class AuthViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             runCatching { authRepository.register(name.trim(), email.trim(), password) }
                 .onSuccess {
-                    // New accounts never have a congregation yet
                     _uiState.value = _uiState.value.copy(isLoading = false, needsCongregationSetup = true)
                 }
                 .onFailure { _uiState.value = _uiState.value.copy(isLoading = false, error = friendlyError(it)) }

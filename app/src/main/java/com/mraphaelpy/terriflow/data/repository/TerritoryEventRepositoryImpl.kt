@@ -34,7 +34,6 @@ class TerritoryEventRepositoryImpl @Inject constructor(
         if (eventDao.getById(event.id) != null) return
 
         val congregationId = congregationRepository.getCurrentCongregationId()
-        // congregationId é necessário para a consulta global de eventos recentes
         val stamped = event.copy(congregationId = event.congregationId.ifBlank { congregationId.orEmpty() })
         eventDao.insert(TerritoryEventEntity.fromDomain(stamped, synced = false))
 
@@ -48,7 +47,6 @@ class TerritoryEventRepositoryImpl @Inject constructor(
         val congregationId = congregationRepository.getCurrentCongregationId() ?: return
         eventDao.getPending().forEach { entity ->
             val event = entity.toDomain().let { it.copy(congregationId = it.congregationId.ifBlank { congregationId }) }
-            // Eventos são imutáveis no Firestore (update negado): só cria se ainda não existir
             runCatching { remoteSource.exists(congregationId, event.territoryId, event.id) }
                 .onSuccess { exists ->
                     if (exists) {

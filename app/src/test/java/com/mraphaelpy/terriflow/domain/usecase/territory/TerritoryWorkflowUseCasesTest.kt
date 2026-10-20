@@ -63,7 +63,6 @@ class TerritoryWorkflowUseCasesTest {
         assertEquals(TerritoryStatus.RETURNED, saved.captured.status)
         assertNull(saved.captured.currentResponsibleId)
         assertTrue(publisher.id in saved.captured.pastResponsibleIds)
-        // Só o admin é avisado: o responsável foi quem devolveu
         coVerify(exactly = 1) { notificationRepository.save(any()) }
         coVerify { notificationRepository.save(match { it.userId == admin.id }) }
     }

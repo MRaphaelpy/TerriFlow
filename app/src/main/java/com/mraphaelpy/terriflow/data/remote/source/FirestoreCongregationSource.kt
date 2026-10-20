@@ -21,7 +21,6 @@ class FirestoreCongregationSource @Inject constructor(
                 "name" to congregation.name,
                 "code" to congregation.code.uppercase(),
                 "createdAt" to Timestamp(congregation.createdAt),
-                // Usado pelas regras para permitir que apenas o criador vire SUPER_ADMIN
                 "createdBy" to createdBy
             )
         ).await()

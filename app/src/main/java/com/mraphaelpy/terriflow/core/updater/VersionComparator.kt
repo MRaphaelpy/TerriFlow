@@ -1,6 +1,5 @@
 package com.mraphaelpy.terriflow.core.updater
 
-/** Compara versões no formato "1.2.3" (aceita prefixo "v" e sufixos como "-beta"). */
 object VersionComparator {
 
     fun isNewer(remoteTag: String, currentVersion: String): Boolean {

@@ -36,7 +36,6 @@ class SettingsRepositoryImpl @Inject constructor(
         _appColor.value = color
     }
 
-    /** Valor salvo inválido (ex.: opção removida numa atualização) volta ao padrão em vez de travar o app. */
     private inline fun <reified T : Enum<T>> readEnum(key: String, default: T): T =
         prefs.getString(key, null)
             ?.let { saved -> enumValues<T>().firstOrNull { it.name == saved } }

@@ -36,7 +36,6 @@ class UserRepositoryImpl @Inject constructor(
     override suspend fun getActiveAdmins(): List<User> =
         userDao.getActiveAdmins().map { it.toDomain() }
 
-    /** Grava no servidor e no Room. Lança exceção se o servidor recusar (ex.: sem permissão). */
     override suspend fun save(user: User) {
         val congregationId = congregationRepository.getCurrentCongregationId()
         if (congregationId != null) remoteSource.upsert(congregationId, user)

@@ -135,4 +135,3 @@ private fun AuditItem(event: TerritoryEvent, user: com.mraphaelpy.terriflow.doma
         }
     }
 }
-

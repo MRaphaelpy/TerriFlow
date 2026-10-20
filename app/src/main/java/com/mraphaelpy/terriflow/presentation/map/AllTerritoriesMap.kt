@@ -64,15 +64,13 @@ fun AllTerritoriesMap(
                 controller.setZoom(12.0)
                 controller.setCenter(GeoPoint(-23.5505, -46.6333))
 
-                // Overlay de localização ao vivo estilo Google Maps (ponto azul + cone direcional)
                 val myLocOverlay = GoogleMapsStyleLocationOverlay(ctx, this).apply {
-                    enableMyLocation()       // ponto azul ao vivo + bússola
-                    enableFollowLocation()   // centraliza automaticamente no início
+                    enableMyLocation()
+                    enableFollowLocation()
                 }
                 overlays.add(myLocOverlay)
                 locationOverlay = myLocOverlay
 
-                // Compass overlay (bússola no canto superior direito)
                 val compass = CompassOverlay(ctx, InternalCompassOrientationProvider(ctx), this)
                 compass.enableCompass()
                 overlays.add(compass)

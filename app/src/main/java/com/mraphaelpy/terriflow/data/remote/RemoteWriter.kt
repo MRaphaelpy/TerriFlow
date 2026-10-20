@@ -9,13 +9,6 @@ import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Emite gravações no Firestore sem bloquear quem chamou.
- *
- * O Firestore aplica a gravação no cache local na hora e a envia ao servidor
- * (na mesma ordem em que foram emitidas) assim que houver conexão. Aguardar a
- * confirmação do servidor na UI fazia as ações travarem indefinidamente offline.
- */
 @Singleton
 class RemoteWriter @Inject constructor(
     @ApplicationScope private val scope: CoroutineScope

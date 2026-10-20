@@ -82,7 +82,7 @@ object KmlParser {
                     }
                     "name" -> when {
                         inPlacemark -> inPlacemarkName = true
-                        folderDepth == 1 -> inFolderName = true  // top-level folder name only
+                        folderDepth == 1 -> inFolderName = true
                     }
                     "description" -> when {
                         inPlacemark -> inPlacemarkDesc = true

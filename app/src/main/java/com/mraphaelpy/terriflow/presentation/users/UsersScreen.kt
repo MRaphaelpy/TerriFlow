@@ -36,7 +36,6 @@ fun UsersScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val clipboardManager = LocalClipboardManager.current
 
-    // Dialog states
     var editingUser by remember { mutableStateOf<User?>(null) }
     var userToChangeRole by remember { mutableStateOf<Pair<User, UserRole>?>(null) }
     var userToToggleStatus by remember { mutableStateOf<User?>(null) }
@@ -87,7 +86,6 @@ fun UsersScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Barra de Busca
             OutlinedTextField(
                 value = uiState.searchQuery,
                 onValueChange = { viewModel.onSearchQueryChanged(it) },
@@ -109,7 +107,6 @@ fun UsersScreen(
                     .padding(horizontal = 16.dp, vertical = 8.dp)
             )
 
-            // Chips de Filtro
             LazyRow(
                 modifier = Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
@@ -197,7 +194,6 @@ fun UsersScreen(
         }
     }
 
-    // Dialog: Editar Nome
     editingUser?.let { targetUser ->
         EditUserNameDialog(
             user = targetUser,
@@ -210,7 +206,6 @@ fun UsersScreen(
         )
     }
 
-    // Dialog: Confirmar Alteração de Função
     userToChangeRole?.let { (targetUser, newRole) ->
         val roleLabel = newRole.label()
         val explanation = when (newRole) {
@@ -260,7 +255,6 @@ fun UsersScreen(
         )
     }
 
-    // Dialog: Confirmar Ativação / Desativação
     userToToggleStatus?.let { targetUser ->
         val isActivating = !targetUser.active
         AlertDialog(
@@ -332,7 +326,6 @@ private fun UserCard(
                 .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Avatar com badge de função
             Box(contentAlignment = Alignment.BottomEnd) {
                 UserAvatar(user = user, size = 52.dp)
 
@@ -365,7 +358,6 @@ private fun UserCard(
 
             Spacer(modifier = Modifier.width(14.dp))
 
-            // Informações do Usuário
             Column(modifier = Modifier.weight(1f)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -402,7 +394,6 @@ private fun UserCard(
 
                 Spacer(Modifier.height(6.dp))
 
-                // Tags de Papel e Status
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -462,7 +453,6 @@ private fun UserCard(
                 }
             }
 
-            // Menu de Opções
             Box {
                 IconButton(onClick = { menuExpanded = true }) {
                     Icon(
@@ -476,7 +466,6 @@ private fun UserCard(
                     expanded = menuExpanded,
                     onDismissRequest = { menuExpanded = false }
                 ) {
-                    // Opção 1: Trocar Nome
                     if (isSelf || canManage) {
                         DropdownMenuItem(
                             text = { Text(if (isSelf) "Editar meu nome" else "Trocar nome") },
@@ -490,7 +479,6 @@ private fun UserCard(
                         )
                     }
 
-                    // Opção 2: Tornar Responsável / Administrador
                     if (canManage && (!isSelf || isSuperAdmin)) {
                         val isTargetSuperAdmin = user.role == UserRole.SUPER_ADMIN
 
@@ -521,7 +509,6 @@ private fun UserCard(
                         }
                     }
 
-                    // Opção 3: Ativar / Desativar
                     if (canManage && !isSelf && user.role != UserRole.SUPER_ADMIN) {
                         DropdownMenuItem(
                             text = { Text(if (user.active) "Desativar usuário" else "Reativar usuário") },
@@ -539,7 +526,6 @@ private fun UserCard(
                         )
                     }
 
-                    // Opção 4: Copiar E-mail
                     if (user.email.isNotBlank()) {
                         HorizontalDivider()
                         DropdownMenuItem(

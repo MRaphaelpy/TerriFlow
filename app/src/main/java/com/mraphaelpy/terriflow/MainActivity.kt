@@ -56,7 +56,6 @@ class MainActivity : ComponentActivity() {
                         val navController = rememberNavController()
                         AppNavigation(navController = navController, startDestination = destination)
 
-                        // Abre o território da notificação uma única vez, após o NavHost existir
                         LaunchedEffect(destination) {
                             if (deepLinkTerritoryId != null && destination == Screen.Dashboard.route) {
                                 navController.navigate(Screen.TerritoryDetail.createRoute(deepLinkTerritoryId))
@@ -76,7 +75,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** Android 13+ exige permissão em tempo de execução para exibir notificações. */
     @Composable
     private fun RequestNotificationPermission() {
         val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }

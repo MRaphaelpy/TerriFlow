@@ -156,7 +156,6 @@ internal fun AssignDialog(
                     }
                 }
 
-                // Aviso de sugestão de rodízio quando o irmão já trabalhou aqui
                 AnimatedVisibility(visible = selectedRotation?.hasWorkedPreviously == true) {
                     Card(
                         modifier = Modifier
@@ -371,7 +370,6 @@ internal fun CompleteDialog(
                     }
                 }
 
-                // Aviso de sugestão de rodízio quando o irmão selecionado já trabalhou aqui
                 AnimatedVisibility(visible = !selectNone && selectedRotation?.hasWorkedPreviously == true) {
                     Card(
                         modifier = Modifier

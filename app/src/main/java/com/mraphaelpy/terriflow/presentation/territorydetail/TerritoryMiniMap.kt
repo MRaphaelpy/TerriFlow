@@ -178,7 +178,6 @@ internal fun TerritoryMiniMap(
                 }
             )
 
-            // Transparent overlay box to allow tapping to open map screen
             Box(
                 modifier = Modifier
                     .fillMaxSize()

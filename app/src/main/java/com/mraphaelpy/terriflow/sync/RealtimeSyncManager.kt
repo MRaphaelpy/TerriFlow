@@ -21,10 +21,6 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * Mantém o Room atualizado com os listeners do Firestore enquanto houver um
- * usuário logado. Os listeners são reiniciados a cada login/logout.
- */
 @Singleton
 class RealtimeSyncManager @Inject constructor(
     private val authRepository: AuthRepository,
@@ -63,7 +59,6 @@ class RealtimeSyncManager @Inject constructor(
             notifications.forEach { notification ->
                 if (notificationDao.getById(notification.id) != null) return@forEach
                 notificationDao.insert(NotificationEntity.fromDomain(notification))
-                // O primeiro snapshot traz o histórico (ex.: após reinstalar): só exibe as novas
                 if (!isFirstSnapshot) {
                     systemNotifier.show(notification.title, notification.body, notification.territoryId)
                 }

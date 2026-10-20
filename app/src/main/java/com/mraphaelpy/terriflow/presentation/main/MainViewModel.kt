@@ -32,7 +32,6 @@ class MainViewModel @Inject constructor(
     val appColor: StateFlow<AppColor> =
         settingsRepository.appColor.stateIn(viewModelScope, SharingStarted.Eagerly, AppColor.DEFAULT)
 
-    /** Rota inicial; `null` enquanto ainda está sendo decidida. */
     private val _startDestination = MutableStateFlow<String?>(null)
     val startDestination: StateFlow<String?> = _startDestination.asStateFlow()
 
@@ -66,7 +65,6 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    // Separado da rota inicial: a consulta ao GitHub não deve atrasar a abertura do app
     private fun checkForUpdate() {
         viewModelScope.launch {
             val info = updateManager.checkForUpdate() ?: return@launch

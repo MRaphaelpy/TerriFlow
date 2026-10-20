@@ -20,12 +20,6 @@ import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 import android.graphics.Color as AndroidColor
 
-/**
- * Overlay de localização ao vivo estilo Google Maps:
- * - Ponto central azul vibrante com contorno branco e leve sombra
- * - Círculo de precisão do GPS (halo suave)
- * - Cone de visão direcional (feixe que aponta para a direção em que o usuário está olhando via bússola do aparelho)
- */
 class GoogleMapsStyleLocationOverlay(
     context: Context,
     mapView: MapView
@@ -103,7 +97,6 @@ class GoogleMapsStyleLocationOverlay(
         val cx = screenPt.x.toFloat()
         val cy = screenPt.y.toFloat()
 
-        // 1. Círculo de precisão do GPS (halo suave azul)
         if (lastFix.hasAccuracy() && lastFix.accuracy > 0) {
             val radiusPx = pj.metersToEquatorPixels(lastFix.accuracy)
             if (radiusPx > 12f && radiusPx < 1200f) {
@@ -112,7 +105,6 @@ class GoogleMapsStyleLocationOverlay(
             }
         }
 
-        // 2. Cone de visão direcional (feixe estilo Google Maps)
         val heading = if (currentHeading != 0f) currentHeading else if (lastFix.hasBearing()) lastFix.bearing else 0f
         val coneRadius = 90f
         val sweepAngle = 55f
@@ -143,10 +135,8 @@ class GoogleMapsStyleLocationOverlay(
         }
         canvas.drawPath(conePath, conePaint)
 
-        // 3. Ponto branco externo com sombra suave
         canvas.drawCircle(cx, cy, 18f, whiteHaloPaint)
 
-        // 4. Ponto azul central (Google Maps)
         canvas.drawCircle(cx, cy, 12f, blueDotPaint)
     }
 }

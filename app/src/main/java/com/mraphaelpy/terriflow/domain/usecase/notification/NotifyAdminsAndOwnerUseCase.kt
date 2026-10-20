@@ -9,10 +9,6 @@ import com.mraphaelpy.terriflow.domain.repository.UserRepository
 import java.util.Date
 import javax.inject.Inject
 
-/**
- * Avisa os administradores e o responsável pelo território sobre uma mudança.
- * Cada destinatário recebe a própria notificação; quem executou a ação não é avisado.
- */
 class NotifyAdminsAndOwnerUseCase @Inject constructor(
     private val userRepository: UserRepository,
     private val notificationRepository: NotificationRepository

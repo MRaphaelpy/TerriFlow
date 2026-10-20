@@ -29,8 +29,6 @@ class CongregationRepositoryImpl @Inject constructor(
     override suspend fun getCurrentCongregationId(): String? {
         prefs.getString(KEY_CONGREGATION_ID, null)?.takeIf { it.isNotEmpty() }?.let { return it }
 
-        // Cache local vazio (dados limpos ou primeiro login neste aparelho):
-        // busca no documento global do usuário no Firestore
         val uid = auth.currentUser?.uid ?: return null
         val remoteId = runCatching { userSource.getCongregationIdForUser(uid) }.getOrNull()
         if (remoteId.isNullOrEmpty()) return null
@@ -74,7 +72,6 @@ class CongregationRepositoryImpl @Inject constructor(
         congregationSource.getById(id)
 
     private fun generateCode(name: String): String {
-        // Remove acentos antes de filtrar, para "São José" virar "SAO-JOSE" e não "SO-JOS"
         val base = Normalizer.normalize(name, Normalizer.Form.NFD)
             .replace(Regex("\\p{M}"), "")
             .uppercase()

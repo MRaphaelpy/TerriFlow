@@ -10,7 +10,6 @@ import kotlinx.coroutines.SupervisorJob
 import javax.inject.Qualifier
 import javax.inject.Singleton
 
-/** Escopo que vive enquanto o processo do app existir (não é cancelado com telas). */
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class ApplicationScope

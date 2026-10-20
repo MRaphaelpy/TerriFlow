@@ -7,10 +7,6 @@ import com.mraphaelpy.terriflow.domain.repository.AuthRepository
 import com.mraphaelpy.terriflow.domain.repository.CongregationRepository
 import javax.inject.Inject
 
-/**
- * Entra em uma congregação pelo código de convite. Quem já tinha perfil nela
- * (ex.: reinstalou o app) mantém o papel e o status anteriores.
- */
 class JoinCongregationUseCase @Inject constructor(
     private val congregationRepository: CongregationRepository,
     private val authRepository: AuthRepository

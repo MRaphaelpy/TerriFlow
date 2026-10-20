@@ -110,7 +110,6 @@ fun UpdateDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Seção "O que mudou"
                 Text(
                     text = "O que mudou:",
                     style = MaterialTheme.typography.labelLarge,

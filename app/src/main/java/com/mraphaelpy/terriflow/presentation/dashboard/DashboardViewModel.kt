@@ -101,7 +101,6 @@ class DashboardViewModel @Inject constructor(
     private fun observeDashboard() {
         authRepository.observeCurrentUser()
             .onEach { user -> _uiState.update { it.copy(currentUser = user) } }
-            // flatMapLatest troca a contagem quando o usuário muda, sem acumular coletores
             .flatMapLatest { user -> user?.let { notificationRepository.countUnread(it.id) } ?: flowOf(0) }
             .onEach { count -> _uiState.update { it.copy(unreadCount = count) } }
             .launchIn(viewModelScope)

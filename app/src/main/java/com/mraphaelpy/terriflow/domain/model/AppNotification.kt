@@ -12,7 +12,6 @@ enum class NotificationType {
     GENERAL
 }
 
-/** Notificação destinada a um único usuário ([userId]). */
 data class AppNotification(
     val id: String = "",
     val userId: String = "",
@@ -46,5 +45,4 @@ data class AppNotification(
     }
 }
 
-/** Texto padrão "T-00001 — Nome" usado nas notificações. */
 val Territory.displayName: String get() = "$code — $name"

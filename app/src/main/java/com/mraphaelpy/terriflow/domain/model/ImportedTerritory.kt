@@ -1,6 +1,5 @@
 package com.mraphaelpy.terriflow.domain.model
 
-/** Território lido de um arquivo externo (KML/KMZ), ainda não salvo. */
 data class ImportedTerritory(
     val name: String,
     val description: String,

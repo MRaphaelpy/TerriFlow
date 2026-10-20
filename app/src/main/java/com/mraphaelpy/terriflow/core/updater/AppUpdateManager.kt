@@ -115,7 +115,6 @@ class AppUpdateManager @Inject constructor(
                 readTimeout = 30000
             }
 
-            // Segue redirects automáticos do GitHub (S3/assets)
             val finalConnection = if (connection.responseCode in listOf(301, 302, 303, 307, 308)) {
                 val newUrl = connection.getHeaderField("Location")
                 (URL(newUrl).openConnection() as HttpURLConnection).apply {
@@ -160,7 +159,6 @@ class AppUpdateManager @Inject constructor(
     fun installApk(file: File) {
         if (!file.exists()) return
 
-        // No Android 8+, verifica permissão de instalar apps de fontes desconhecidas
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             if (!context.packageManager.canRequestPackageInstalls()) {
                 val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {

@@ -46,9 +46,6 @@ import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polygon
 
-// ---------------------------------------------------------------------------
-// Mapa full-screen para edição de pino e contorno
-// ---------------------------------------------------------------------------
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun FullMapEditor(
@@ -96,17 +93,14 @@ internal fun FullMapEditor(
             },
             update = { mapView ->
                 org.osmdroid.views.overlay.infowindow.InfoWindow.closeAllInfoWindowsOn(mapView)
-                // Remover todos os marcadores e polígonos
                 mapView.overlays.removeAll { it is Marker || it is Polygon }
                 boundaryMarkers.clear()
                 
-                // 1. Adicionar Polígono
                 if (uiState.boundaryPoints.size >= 2) {
                     val poly = buildPolygon(uiState.boundaryPoints)
-                    mapView.overlays.add(0, poly) // Adiciona por baixo dos marcadores
+                    mapView.overlays.add(0, poly)
                 }
                 
-                // 2. Adicionar Pino de Localização Apenas no Modo PIN
                 val lat = uiState.latitude
                 val lng = uiState.longitude
                 if (mapMode == MapMode.PIN && lat != null && lng != null) {
@@ -136,7 +130,6 @@ internal fun FullMapEditor(
                     mapView.overlays.add(pinMarker)
                 }
                 
-                // 3. Adicionar Pinos de Contorno
                 if (mapMode == MapMode.BOUNDARY) {
                     uiState.boundaryPoints.forEachIndexed { index, pt ->
                         val m = Marker(mapView).apply {
@@ -158,7 +151,6 @@ internal fun FullMapEditor(
                                     )
                                 }
                                 override fun onMarkerDrag(marker: Marker) {
-                                    // Redesenhar polígono em tempo real durante o arraste
                                     val poly = mapView.overlays.filterIsInstance<Polygon>().firstOrNull()
                                     if (poly != null) {
                                         val pts = boundaryMarkers.map { GeoPoint(it.position.latitude, it.position.longitude) }.toMutableList()
@@ -181,7 +173,6 @@ internal fun FullMapEditor(
             }
         )
 
-        // Top-Left Back/Close Button
         SmallFloatingActionButton(
             onClick = onClose,
             modifier = Modifier
@@ -193,7 +184,6 @@ internal fun FullMapEditor(
             Icon(Icons.AutoMirrored.Filled.ArrowBack, "Voltar")
         }
 
-        // Bottom Control Panel
         Surface(
             modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
@@ -252,9 +242,6 @@ internal fun FullMapEditor(
     }
 }
 
-// ---------------------------------------------------------------------------
-// Mini-mapa pré-visualização (somente leitura, clicável para expandir)
-// ---------------------------------------------------------------------------
 @Composable
 internal fun PreviewMap(
     context: Context,
@@ -274,7 +261,6 @@ internal fun PreviewMap(
                     setMultiTouchControls(false)
                     controller.setZoom(16.0)
                     
-                    // Centralizar preferencialmente no polígono, se houver
                     if (boundaryPoints.isNotEmpty()) {
                         val centerLat = boundaryPoints.map { it.lat }.average()
                         val centerLng = boundaryPoints.map { it.lng }.average()
@@ -289,7 +275,6 @@ internal fun PreviewMap(
                 }
             },
             update = { mapView ->
-                // Limpa overlays anteriores
                 mapView.overlays.removeAll { it is Marker || it is Polygon }
                 
                 if (boundaryPoints.size >= 3) {
@@ -308,7 +293,6 @@ internal fun PreviewMap(
             }
         )
 
-        // Botão expandir sobreposto
         SmallFloatingActionButton(
             onClick = onExpand,
             modifier = Modifier.align(Alignment.TopEnd).padding(8.dp),
@@ -319,14 +303,10 @@ internal fun PreviewMap(
     }
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 private fun buildPolygon(points: List<LatLng>): Polygon {
     return Polygon().apply {
         val geoPoints = points.map { GeoPoint(it.lat, it.lng) }.toMutableList()
-        if (geoPoints.isNotEmpty()) geoPoints.add(geoPoints.first()) // fechar
+        if (geoPoints.isNotEmpty()) geoPoints.add(geoPoints.first())
         this.points = geoPoints
         fillPaint.color = MapColors.TERRITORY_FILL
         outlinePaint.color = MapColors.OUTLINE
@@ -336,15 +316,15 @@ private fun buildPolygon(points: List<LatLng>): Polygon {
 
 private fun createBoundaryMarkerIcon(context: Context): android.graphics.drawable.Drawable {
     val density = context.resources.displayMetrics.density
-    val size = (40 * density).toInt() // Thumb-sized (40dp)
+    val size = (40 * density).toInt()
     val bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
     
     val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFF2196F3.toInt() // Primary blue
+        color = 0xFF2196F3.toInt()
     }
     val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = 0xFFFFFFFF.toInt() // White border
+        color = 0xFFFFFFFF.toInt()
         style = Paint.Style.STROKE
         strokeWidth = 3f * density
     }
@@ -356,7 +336,6 @@ private fun createBoundaryMarkerIcon(context: Context): android.graphics.drawabl
     return android.graphics.drawable.BitmapDrawable(context.resources, bitmap)
 }
 
-// Balão de texto customizado e bonito para o mapa
 private class ModernInfoWindow(mapView: MapView) : org.osmdroid.views.overlay.infowindow.InfoWindow(
     createModernBubbleView(mapView.context), mapView
 ) {
@@ -371,7 +350,7 @@ private class ModernInfoWindow(mapView: MapView) : org.osmdroid.views.overlay.in
         mView.setOnClickListener { close() }
         
         handler.removeCallbacks(closeRunnable)
-        handler.postDelayed(closeRunnable, 2500) // Fecha após 2.5 segundos
+        handler.postDelayed(closeRunnable, 2500)
     }
     
     override fun onClose() {
@@ -386,7 +365,7 @@ private class ModernInfoWindow(mapView: MapView) : org.osmdroid.views.overlay.in
             val density = context.resources.displayMetrics.density
             
             val drawable = android.graphics.drawable.GradientDrawable()
-            drawable.setColor(0xFF2196F3.toInt()) // Azul
+            drawable.setColor(0xFF2196F3.toInt())
             drawable.cornerRadius = 16f * density
             
             linearLayout.background = drawable
@@ -398,7 +377,7 @@ private class ModernInfoWindow(mapView: MapView) : org.osmdroid.views.overlay.in
             
             val textView = android.widget.TextView(context)
             textView.id = android.R.id.text1
-            textView.setTextColor(0xFFFFFFFF.toInt()) // Branco
+            textView.setTextColor(0xFFFFFFFF.toInt())
             textView.textSize = 14f
             textView.setTypeface(null, android.graphics.Typeface.BOLD)
             

@@ -32,7 +32,6 @@ class TerriFlowMessagingService : FirebaseMessagingService() {
         val title = remoteMessage.notification?.title ?: remoteMessage.data["title"] ?: return
         val body = remoteMessage.notification?.body ?: remoteMessage.data["body"] ?: return
         val userId = authRepository.currentUserId ?: return
-        // Com o id do documento, o push e o listener do Firestore viram uma única notificação
         val notificationId = remoteMessage.data["notificationId"]
 
         appScope.launch {

@@ -59,14 +59,12 @@ fun CongregationSetupScreen(
     var countdown by remember { mutableIntStateOf(4) }
     val clipboardManager = LocalClipboardManager.current
 
-    // Ao entrar com código: navega imediatamente
     LaunchedEffect(uiState.isComplete) {
         if (uiState.isComplete && uiState.congregation == null) {
             onSetupComplete()
         }
     }
 
-    // Ao criar congregação: conta 4 segundos mostrando o código, depois navega
     LaunchedEffect(uiState.congregation) {
         if (uiState.congregation != null) {
             countdown = 4
@@ -115,7 +113,6 @@ fun CongregationSetupScreen(
 
             Spacer(Modifier.height(32.dp))
 
-            // Abas só aparecem enquanto a congregação não foi criada
             if (uiState.congregation == null) {
                 PrimaryTabRow(selectedTabIndex = tab) {
                     Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Criar") })
@@ -199,7 +196,6 @@ fun CongregationSetupScreen(
                 }
             }
 
-            // Card do código — aparece após criar a congregação
             uiState.congregation?.let { congregation ->
                 Spacer(Modifier.height(24.dp))
                 Card(
@@ -222,7 +218,6 @@ fun CongregationSetupScreen(
                         )
                         Spacer(Modifier.height(12.dp))
 
-                        // Código com botão de copiar
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
@@ -264,7 +259,6 @@ fun CongregationSetupScreen(
 
                 Spacer(Modifier.height(16.dp))
 
-                // Barra de progresso + contador regressivo
                 LinearProgressIndicator(
                     progress = { (4 - countdown) / 4f },
                     modifier = Modifier.fillMaxWidth()
@@ -278,7 +272,6 @@ fun CongregationSetupScreen(
 
                 Spacer(Modifier.height(12.dp))
 
-                // Botão para entrar imediatamente sem esperar
                 OutlinedButton(
                     onClick = onSetupComplete,
                     modifier = Modifier.fillMaxWidth()

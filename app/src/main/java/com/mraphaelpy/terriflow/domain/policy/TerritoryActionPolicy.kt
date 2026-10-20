@@ -5,11 +5,6 @@ import com.mraphaelpy.terriflow.domain.model.TerritoryAction
 import com.mraphaelpy.terriflow.domain.model.TerritoryStatus
 import com.mraphaelpy.terriflow.domain.model.User
 
-/**
- * Fonte única das regras de quem pode executar cada ação em um território
- * e em quais status. Usada tanto pelos casos de uso (validação) quanto pela UI
- * (exibição dos botões).
- */
 object TerritoryActionPolicy {
 
     private val assignableStatuses = setOf(

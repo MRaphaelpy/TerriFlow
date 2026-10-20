@@ -9,7 +9,6 @@ import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
 import java.util.Date
 import javax.inject.Inject
 
-/** Inicia o trabalho no território, ou o retoma se estiver pausado. */
 class StartTerritoryUseCase @Inject constructor(
     private val guard: TerritoryActionGuard,
     private val territoryRepository: TerritoryRepository,

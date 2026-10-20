@@ -9,13 +9,8 @@ import com.mraphaelpy.terriflow.domain.repository.AuthRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
 import javax.inject.Inject
 
-/** Usuário autenticado e território carregado, já validados para a ação. */
 data class AuthorizedTerritoryAction(val actor: User, val territory: Territory)
 
-/**
- * Carrega o usuário atual e o território e garante que a ação é permitida
- * pela [TerritoryActionPolicy]. Evita repetir essa validação em cada caso de uso.
- */
 class TerritoryActionGuard @Inject constructor(
     private val authRepository: AuthRepository,
     private val territoryRepository: TerritoryRepository

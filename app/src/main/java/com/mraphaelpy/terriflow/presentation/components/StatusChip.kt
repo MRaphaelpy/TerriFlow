@@ -11,11 +11,6 @@ import androidx.compose.ui.unit.dp
 import com.mraphaelpy.terriflow.domain.model.TerritoryStatus
 import com.mraphaelpy.terriflow.domain.model.label
 
-/**
- * Chip visual que representa o status de um território.
- *
- * Usado em TerritoryListScreen (item da lista) e TerritoryDetailScreen (cabeçalho do card).
- */
 @Composable
 fun StatusChip(status: TerritoryStatus, modifier: Modifier = Modifier) {
     val color = when (status) {

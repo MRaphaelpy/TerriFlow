@@ -69,7 +69,6 @@ private val DarkColorScheme = darkColorScheme(
     outlineVariant = Color(0xFF414943)
 )
 
-
 private val BlueColorScheme = lightColorScheme(
     primary = TerriBlue, onPrimary = Color.White, primaryContainer = TerriBlueContainer, onPrimaryContainer = TerriOnBlueContainer,
     secondary = TerriBlue, onSecondary = Color.White, secondaryContainer = TerriBlueContainer,

@@ -1,9 +1,5 @@
 package com.mraphaelpy.terriflow.domain.model
 
-/**
- * Erros de regra de negócio. A mensagem já é amigável para exibição ao usuário,
- * permitindo que a camada de apresentação apenas repasse [message].
- */
 sealed class DomainException(message: String, cause: Throwable? = null) : Exception(message, cause) {
     class NotAuthenticated : DomainException("Usuário não autenticado")
     class TerritoryNotFound : DomainException("Território não encontrado")
@@ -16,7 +12,6 @@ sealed class DomainException(message: String, cause: Throwable? = null) : Except
     class InvalidCongregationCode(code: String) : DomainException("Código de congregação inválido: $code")
 }
 
-/** Erros de autenticação traduzidos a partir do provedor (Firebase). */
 sealed class AuthException(message: String, cause: Throwable? = null) : Exception(message, cause) {
     class InvalidCredentials(cause: Throwable? = null) : AuthException("E-mail ou senha incorretos", cause)
     class UserNotFound(cause: Throwable? = null) : AuthException("Usuário não encontrado", cause)

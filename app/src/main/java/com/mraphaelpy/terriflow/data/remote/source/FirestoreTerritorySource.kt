@@ -14,10 +14,8 @@ import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Lista completa de territórios recebida do Firestore. */
 data class TerritorySnapshot(
     val territories: List<TerritoryDto>,
-    /** `true` quando veio do cache local e pode não refletir o servidor. */
     val isFromCache: Boolean
 )
 
@@ -68,10 +66,6 @@ class FirestoreTerritorySource @Inject constructor(
         territoriesCollection(congregationId).document(id).delete().await()
     }
 
-    /**
-     * Maior código automático (`T-NNNNN`) já usado. Filtra pelo intervalo do prefixo
-     * para que códigos personalizados (ex.: "Centro") não quebrem a sequência.
-     */
     suspend fun getLastAutomaticCode(congregationId: String): String? =
         territoriesCollection(congregationId)
             .whereGreaterThanOrEqualTo("code", TerritoryCode.PREFIX + "0")

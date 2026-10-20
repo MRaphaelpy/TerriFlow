@@ -267,7 +267,6 @@ fun MapScreen(
                 }
             }
 
-            // FAB: centralizar na minha localização
             FloatingActionButton(
                 onClick = {
                     mapViewRef?.let { mv ->

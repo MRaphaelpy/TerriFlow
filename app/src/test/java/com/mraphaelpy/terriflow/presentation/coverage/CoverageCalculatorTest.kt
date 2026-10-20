@@ -32,7 +32,6 @@ class CoverageCalculatorTest {
         val neverWorked = CoverageCalculator.sort(coverages, CoverageSortOption.NEVER_WORKED)
         assertEquals(listOf("never"), neverWorked.ids())
 
-        // Antes da correção, ordenar após o filtro acima mantinha apenas "never"
         assertEquals(listOf("never", "old", "recent"), CoverageCalculator.sort(coverages, CoverageSortOption.OLDEST_COMPLETED_FIRST).ids())
         assertEquals(listOf("recent", "old", "never"), CoverageCalculator.sort(coverages, CoverageSortOption.NEWEST_COMPLETED_FIRST).ids())
         assertEquals("recent", CoverageCalculator.sort(coverages, CoverageSortOption.MOST_WORKED).first().territory.id)

@@ -22,8 +22,6 @@ class ReturnTerritoryUseCase @Inject constructor(
         val (actor, territory) = guard.authorize(territoryId, TerritoryAction.RETURN)
         val now = Date()
 
-        // Evento antes do território: depois da devolução o usuário deixa de ser
-        // o responsável e as regras do Firestore recusariam o evento.
         eventRepository.save(TerritoryEvent.create(territory.id, actor, EventType.RETURNED, now))
 
         territoryRepository.save(

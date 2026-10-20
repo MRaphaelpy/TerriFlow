@@ -116,7 +116,6 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
 
-            // ── Seção Meu Perfil ──────────────────────────────────────
             uiState.currentUser?.let { user ->
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
@@ -209,7 +208,6 @@ fun SettingsScreen(
                 }
             }
 
-            // ── Seção Minha Congregação ───────────────────────────────
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     text = "Minha Congregação",
@@ -313,7 +311,6 @@ fun SettingsScreen(
                 }
             }
 
-            // ── Tema ─────────────────────────────────────────────────
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     text = "Tema do Aplicativo",
@@ -348,7 +345,6 @@ fun SettingsScreen(
                 }
             }
 
-            // ── Cores ─────────────────────────────────────────────────
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
                     text = "Cores",
@@ -393,7 +389,6 @@ fun SettingsScreen(
                 }
             }
 
-            // Seção: Atualizações do Aplicativo
             ElevatedCard(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.extraLarge
@@ -465,7 +460,6 @@ fun SettingsScreen(
         }
     }
 
-    // Modal de Atualização disponível
     uiState.availableUpdate?.let { updateInfo ->
         UpdateDialog(
             updateInfo = updateInfo,
@@ -474,7 +468,6 @@ fun SettingsScreen(
         )
     }
 
-    // Modal de Edição de Nome do Usuário
     if (showEditNameDialog && uiState.currentUser != null) {
         val currentUser = uiState.currentUser!!
         var tempName by remember { mutableStateOf(currentUser.name) }

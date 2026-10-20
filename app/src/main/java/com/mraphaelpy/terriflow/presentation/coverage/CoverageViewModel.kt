@@ -49,8 +49,6 @@ class CoverageViewModel @Inject constructor(
         CoverageCalculator::compute
     )
 
-    // A ordenação é sempre aplicada sobre a lista completa; antes ela era aplicada
-    // sobre o resultado do filtro anterior e "Nunca trabalhados" fazia territórios sumirem.
     val uiState: StateFlow<CoverageUiState> = combine(allCoverages, sortOption) { coverages, option ->
         CoverageUiState(
             coverages = CoverageCalculator.sort(coverages, option),

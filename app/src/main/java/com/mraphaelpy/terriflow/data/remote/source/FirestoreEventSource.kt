@@ -21,10 +21,6 @@ class FirestoreEventSource @Inject constructor(
             .collection("territories").document(territoryId)
             .collection("events")
 
-    /**
-     * Eventos mais recentes de todos os territórios da congregação.
-     * Requer o índice de collection group (congregationId ASC, timestamp DESC).
-     */
     fun observeRecent(congregationId: String, limit: Long = 50): Flow<List<TerritoryEventDto>> = callbackFlow {
         val subscription = firestore.collectionGroup("events")
             .whereEqualTo("congregationId", congregationId)

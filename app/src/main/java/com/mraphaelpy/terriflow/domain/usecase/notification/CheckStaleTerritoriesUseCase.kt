@@ -10,19 +10,11 @@ import java.util.Date
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
-/**
- * Gera lembretes para os territórios do usuário logado que estão parados.
- *
- * Cada lembrete tem id determinístico (território + início do período + semana),
- * então rodar o worker várias vezes ao dia ou em vários aparelhos não duplica:
- * o responsável recebe no máximo um lembrete por semana para cada território.
- */
 class CheckStaleTerritoriesUseCase @Inject constructor(
     private val authRepository: AuthRepository,
     private val territoryRepository: TerritoryRepository,
     private val notificationRepository: NotificationRepository
 ) {
-    /** Retorna apenas as notificações novas criadas nesta execução. */
     suspend operator fun invoke(now: Date = Date()): List<AppNotification> {
         val userId = authRepository.currentUserId ?: return emptyList()
 

@@ -2,19 +2,10 @@ package com.mraphaelpy.terriflow.core.util
 
 import com.mraphaelpy.terriflow.domain.model.LatLng
 
-/**
- * Aceita os formatos que o Google Maps copia para a área de transferência:
- *  - "-23.5505, -46.6333"          (vírgula separando)
- *  - "-23.5505 -46.6333"           (espaço separando)
- *  - "-23°33'01.8\"S 46°37'59.9\"W" (graus/minutos/segundos)
- *  - "https://maps.google.com/?q=-23.5505,-46.6333" (URL)
- */
 object CoordinateParser {
 
     fun parse(input: String): LatLng? {
         val trimmed = input.trim()
-        // DMS antes do decimal: o decimal trata ° ' " como separadores e leria
-        // "23°33'01.8\"S 46°37'59.9\"W" como lat=23, lng=33
         return tryUrl(trimmed)
             ?: tryDMS(trimmed)
             ?: tryDecimal(trimmed)

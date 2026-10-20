@@ -90,7 +90,6 @@ fun EditTerritoryScreen(
     LaunchedEffect(uiState.success) { if (uiState.success) onSaved() }
 
     if (mapExpanded) {
-        // Tela cheia de edição do mapa
         FullMapEditor(
             context = context,
             uiState = uiState,
@@ -142,7 +141,6 @@ fun EditTerritoryScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Campos de texto
             OutlinedTextField(value = code, onValueChange = { code = it },
                 label = { Text("Número/Código") }, singleLine = true,
                 placeholder = { Text("Ex: 14") },
@@ -166,11 +164,9 @@ fun EditTerritoryScreen(
 
             HorizontalDivider()
 
-            // Seção de localização no mapa
             Text("Localização no mapa", style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.SemiBold)
 
-            // Campo de colar coordenadas do Google Maps
             OutlinedTextField(
                 value = coordInput,
                 onValueChange = {
@@ -208,7 +204,6 @@ fun EditTerritoryScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            // Status da localização atual
             if (uiState.latitude != null && uiState.longitude != null) {
                 Card(colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer)) {
@@ -236,14 +231,12 @@ fun EditTerritoryScreen(
                             }
                         }
                         Row {
-                            // Abrir no Google Maps
                             IconButton(onClick = {
                                 openInGoogleMaps(context, uiState.latitude, uiState.longitude)
                             }) {
                                 Icon(Icons.Default.OpenInNew, "Abrir no Google Maps",
                                     tint = MaterialTheme.colorScheme.primary)
                             }
-                            // Limpar pino
                             IconButton(onClick = { viewModel.clearPin() }) {
                                 Icon(Icons.Default.LocationOff, "Remover localização",
                                     tint = MaterialTheme.colorScheme.error)
@@ -253,7 +246,6 @@ fun EditTerritoryScreen(
                 }
             }
 
-            // Botões de ação do mapa
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
                     onClick = { mapExpanded = true; mapMode = MapMode.PIN },
@@ -273,7 +265,6 @@ fun EditTerritoryScreen(
                 }
             }
 
-            // Mini-mapa preview (somente leitura)
             val previewLat = uiState.latitude
             val previewLng = uiState.longitude
             if (previewLat != null && previewLng != null) {

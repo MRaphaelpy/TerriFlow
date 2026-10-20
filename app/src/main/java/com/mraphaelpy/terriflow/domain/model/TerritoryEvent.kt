@@ -40,7 +40,6 @@ data class TerritoryEvent(
     val congregationId: String = ""
 ) {
     companion object {
-        /** Cria um novo evento registrando [actor] como autor da ação. */
         fun create(
             territoryId: String,
             actor: User,

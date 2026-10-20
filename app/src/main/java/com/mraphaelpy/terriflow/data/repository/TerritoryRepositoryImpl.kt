@@ -61,7 +61,6 @@ class TerritoryRepositoryImpl @Inject constructor(
 
     override suspend fun save(territory: Territory): Territory {
         val toSave = if (territory.id.isEmpty()) territory.copy(id = UUID.randomUUID().toString()) else territory
-        // Mantém a versão atual; ela só avança quando o servidor confirmar a gravação
         val currentVersion = territoryDao.getById(toSave.id)?.syncVersion ?: 0L
         territoryDao.upsert(TerritoryEntity.fromDomain(toSave, synced = false).copy(syncVersion = currentVersion))
         congregationRepository.getCurrentCongregationId()?.let { push(it, toSave, currentVersion) }
@@ -99,7 +98,6 @@ class TerritoryRepositoryImpl @Inject constructor(
     override suspend fun delete(id: String) {
         merger.removeLocally(id)
         val congregationId = congregationRepository.getCurrentCongregationId() ?: return
-        // Remoção remota em segundo plano: com o app offline o await só termina ao reconectar
         appScope.launch {
             runCatching {
                 remoteEventSource.deleteAllByTerritory(congregationId, id)
@@ -111,7 +109,6 @@ class TerritoryRepositoryImpl @Inject constructor(
     private fun push(congregationId: String, territory: Territory, currentVersion: Long) {
         val nextVersion = currentVersion + 1
         remoteWriter.write(TAG, { remoteSource.upsert(congregationId, territory, nextVersion) }) {
-            // Só marca como sincronizado se não houve outra edição local nesse meio tempo
             territoryDao.markSyncedIfUnchanged(territory.id, nextVersion, territory.updatedAt)
         }
     }

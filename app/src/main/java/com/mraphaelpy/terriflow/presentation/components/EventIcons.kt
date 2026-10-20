@@ -14,11 +14,6 @@ import androidx.compose.material.icons.filled.TaskAlt
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.mraphaelpy.terriflow.domain.model.EventType
 
-/**
- * Mapeia um [EventType] para o ícone correspondente na UI.
- *
- * Anteriormente duplicado em TerritoryDetailScreen e AuditScreen.
- */
 fun eventIcon(type: EventType): ImageVector = when (type) {
     EventType.CREATED -> Icons.Default.AddCircle
     EventType.ASSIGNED -> Icons.Default.PersonAdd

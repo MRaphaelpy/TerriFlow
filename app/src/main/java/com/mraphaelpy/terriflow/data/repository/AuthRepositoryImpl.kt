@@ -80,7 +80,6 @@ class AuthRepositoryImpl @Inject constructor(
         val firebaseUser = mapAuthErrors { auth.signInWithCredential(credential).await() }.user ?: return
         if (cacheRemoteProfile()) return
 
-        // Usuário Google sem congregação: guarda um perfil local até ele criar/entrar em uma
         saveLocalProfile(
             User(
                 id = firebaseUser.uid,
@@ -168,7 +167,6 @@ class AuthRepositoryImpl @Inject constructor(
         return profile
     }
 
-    /** Busca o perfil remoto do usuário logado e guarda no Room. Retorna se encontrou. */
     private suspend fun cacheRemoteProfile(): Boolean {
         val uid = currentUserId ?: return false
         val congregationId = resolveAndSaveCongregationId() ?: return false
