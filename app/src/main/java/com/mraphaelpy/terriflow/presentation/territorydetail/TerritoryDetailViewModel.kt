@@ -79,6 +79,8 @@ class TerritoryDetailViewModel @Inject constructor(
 
     private val territoryId: String = checkNotNull(savedStateHandle["territoryId"])
 
+    private var allTerritories: List<Territory> = emptyList()
+
     private val _uiState = MutableStateFlow(TerritoryDetailUiState())
     val uiState: StateFlow<TerritoryDetailUiState> = _uiState.asStateFlow()
 
@@ -94,7 +96,9 @@ class TerritoryDetailViewModel @Inject constructor(
         }
         viewModelScope.launch {
             territoryRepository.observeAll().collect { all ->
+                allTerritories = all
                 _uiState.update { it.copy(territoryColor = territoryPalette(all)[territoryId]) }
+                updateStateWithCalculations()
             }
         }
         viewModelScope.launch {
@@ -123,7 +127,7 @@ class TerritoryDetailViewModel @Inject constructor(
         responsibles: List<User> = _uiState.value.responsibles,
         isLoading: Boolean = _uiState.value.isLoading
     ) {
-        val rotation = TerritoryRotationHelper.computeRotationInfo(responsibles, territory, events)
+        val rotation = TerritoryRotationHelper.computeRotationInfo(responsibles, territory, events, allTerritories)
         val past = rotation.filter { it.hasWorkedPreviously }.sortedByDescending { it.lastAssignedDate }
         val suggested = rotation.filter { !it.hasWorkedPreviously && it.user.id != territory?.currentResponsibleId }
         val cycles = computeHistoryCycles(events)
