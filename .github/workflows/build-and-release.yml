@@ -5,10 +5,18 @@ on:
     branches:
       - main
     paths-ignore:
-      - 'README.md'
+      - '**/*.md'
       - '.gitignore'
       - 'docs/**'
+      - 'firestore.rules'
+      - 'firestore.indexes.json'
+      - 'firebase.json'
+      - '.firebaserc'
   workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -36,6 +44,9 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
+      - name: Run unit tests
+        run: ./gradlew testDebugUnitTest --no-daemon
+
       - name: Determine Version Tag
         id: version
         run: |
@@ -50,6 +61,17 @@ jobs:
           APP_VERSION_CODE: ${{ steps.version.outputs.version_code }}
         run: ./gradlew assembleRelease -PversionName="${{ steps.version.outputs.version_name }}" -PversionCode="${{ steps.version.outputs.version_code }}" --no-daemon
 
+      - name: Generate release notes
+        run: |
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          RANGE=${PREVIOUS_TAG:+$PREVIOUS_TAG..HEAD}
+          git log $RANGE --no-merges --pretty=format:'%s%n' \
+            | grep -E '^(feat|fix|perf)(\(|:)' \
+            | sed -E 's/^feat(\([^)]*\))?: /- Novo: /; s/^fix(\([^)]*\))?: /- Correção: /; s/^perf(\([^)]*\))?: /- Desempenho: /' \
+            > release-notes.md || true
+          if [ ! -s release-notes.md ]; then echo "- Melhorias gerais e correções." > release-notes.md; fi
+          cat release-notes.md
+
       - name: Prepare APK artifact
         run: |
           mkdir -p release-apk
@@ -61,7 +83,7 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           name: "TerriFlow ${{ steps.version.outputs.tag }}"
           files: release-apk/TerriFlow.apk
-          generate_release_notes: true
+          body_path: release-notes.md
           draft: false
           prerelease: false
         env:
