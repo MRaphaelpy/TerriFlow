@@ -1,13 +1,12 @@
 package com.mraphaelpy.terriflow.presentation.audit
 
+import com.mraphaelpy.terriflow.core.util.DayGrouping
 import com.mraphaelpy.terriflow.domain.model.EventType
 import com.mraphaelpy.terriflow.domain.model.ServiceYear
 import com.mraphaelpy.terriflow.domain.model.Territory
 import com.mraphaelpy.terriflow.domain.model.TerritoryEvent
-import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
-import java.util.Locale
 
 enum class AuditPeriod(val label: String) {
     LAST_30_DAYS("Últimos 30 dias"),
@@ -54,32 +53,8 @@ data class AuditEntry(val event: TerritoryEvent, val territory: Territory?)
 data class AuditDay(val label: String, val entries: List<AuditEntry>)
 
 object AuditGrouping {
-    private val locale = Locale("pt", "BR")
-
-    fun byDay(entries: List<AuditEntry>, now: Date = Date()): List<AuditDay> {
-        val dayFormat = SimpleDateFormat("EEEE, d 'de' MMMM", locale)
-        val dayWithYearFormat = SimpleDateFormat("d 'de' MMMM 'de' yyyy", locale)
-        val today = dayKey(now)
-        val yesterday = dayKey(Calendar.getInstance().apply { time = now; add(Calendar.DAY_OF_YEAR, -1) }.time)
-        val currentYear = Calendar.getInstance().apply { time = now }.get(Calendar.YEAR)
-
-        return entries.groupBy { dayKey(it.event.timestamp) }.map { (key, dayEntries) ->
-            val date = dayEntries.first().event.timestamp
-            val label = when (key) {
-                today -> "Hoje"
-                yesterday -> "Ontem"
-                else -> {
-                    val year = Calendar.getInstance().apply { time = date }.get(Calendar.YEAR)
-                    (if (year == currentYear) dayFormat else dayWithYearFormat).format(date)
-                        .replaceFirstChar { it.uppercase(locale) }
-                }
-            }
-            AuditDay(label, dayEntries)
-        }
-    }
-
-    private fun dayKey(date: Date): Int = Calendar.getInstance().apply { time = date }
-        .let { it.get(Calendar.YEAR) * 1000 + it.get(Calendar.DAY_OF_YEAR) }
+    fun byDay(entries: List<AuditEntry>, now: Date = Date()): List<AuditDay> =
+        DayGrouping.group(entries, now) { it.event.timestamp }.map { AuditDay(it.label, it.items) }
 }
 
 fun describeChanges(event: TerritoryEvent): List<String> {

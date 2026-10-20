@@ -2,52 +2,62 @@ package com.mraphaelpy.terriflow.presentation.notifications
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mraphaelpy.terriflow.core.util.DayGroup
+import com.mraphaelpy.terriflow.core.util.DayGrouping
 import com.mraphaelpy.terriflow.domain.model.AppNotification
 import com.mraphaelpy.terriflow.domain.repository.AuthRepository
 import com.mraphaelpy.terriflow.domain.repository.NotificationRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class NotificationsUiState(
-    val notifications: List<AppNotification> = emptyList(),
+    val days: List<DayGroup<AppNotification>> = emptyList(),
+    val unreadCount: Int = 0,
+    val totalCount: Int = 0,
+    val onlyUnread: Boolean = false,
     val isLoading: Boolean = true
 )
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class NotificationsViewModel @Inject constructor(
     private val notificationRepository: NotificationRepository,
     private val authRepository: AuthRepository
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(NotificationsUiState())
-    val uiState: StateFlow<NotificationsUiState> = _uiState.asStateFlow()
+    private val onlyUnread = MutableStateFlow(false)
+
+    val uiState: StateFlow<NotificationsUiState> = combine(
+        authRepository.observeCurrentUserId().flatMapLatest { uid ->
+            uid?.let { notificationRepository.observeByUser(it) } ?: flowOf(emptyList())
+        },
+        onlyUnread
+    ) { notifications, unreadOnly ->
+        val visible = if (unreadOnly) notifications.filter { !it.read } else notifications
+        NotificationsUiState(
+            days = DayGrouping.group(visible) { it.createdAt },
+            unreadCount = notifications.count { !it.read },
+            totalCount = notifications.size,
+            onlyUnread = unreadOnly,
+            isLoading = false
+        )
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), NotificationsUiState())
 
     init {
-        viewModelScope.launch {
-            runCatching { notificationRepository.syncFromRemote() }
-        }
+        viewModelScope.launch { runCatching { notificationRepository.syncFromRemote() } }
+    }
 
-        val userId = authRepository.currentUserId
-
-        if (userId != null) {
-            viewModelScope.launch {
-                notificationRepository.observeByUser(userId).collect { notifications ->
-                    _uiState.value = NotificationsUiState(
-                        notifications = notifications,
-                        isLoading = false
-                    )
-                }
-            }
-        } else {
-            _uiState.value = NotificationsUiState(
-                notifications = emptyList(),
-                isLoading = false
-            )
-        }
+    fun setOnlyUnread(value: Boolean) {
+        onlyUnread.value = value
     }
 
     fun markRead(id: String) {
