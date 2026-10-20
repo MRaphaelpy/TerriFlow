@@ -2,33 +2,41 @@ package com.mraphaelpy.terriflow.data.repository
 
 import android.util.Log
 import com.mraphaelpy.terriflow.data.local.dao.TerritoryEventDao
+import com.mraphaelpy.terriflow.data.local.dao.UserDao
 import com.mraphaelpy.terriflow.data.local.entity.TerritoryEventEntity
 import com.mraphaelpy.terriflow.data.remote.RemoteWriter
 import com.mraphaelpy.terriflow.data.remote.source.FirestoreEventSource
 import com.mraphaelpy.terriflow.domain.model.TerritoryEvent
+import com.mraphaelpy.terriflow.domain.model.withCurrentNames
 import com.mraphaelpy.terriflow.domain.repository.CongregationRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryEventRepository
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class TerritoryEventRepositoryImpl @Inject constructor(
     private val eventDao: TerritoryEventDao,
+    private val userDao: UserDao,
     private val remoteSource: FirestoreEventSource,
     private val remoteWriter: RemoteWriter,
     private val congregationRepository: CongregationRepository
 ) : TerritoryEventRepository {
 
     override fun observeAll(): Flow<List<TerritoryEvent>> =
-        eventDao.observeAll().map { list -> list.map { it.toDomain() } }
+        eventDao.observeAll().withCurrentNames()
 
     override fun observeByTerritory(territoryId: String): Flow<List<TerritoryEvent>> =
-        eventDao.observeByTerritory(territoryId).map { list -> list.map { it.toDomain() } }
+        eventDao.observeByTerritory(territoryId).withCurrentNames()
 
     override fun observeRecent(limit: Int): Flow<List<TerritoryEvent>> =
-        eventDao.observeRecent(limit).map { list -> list.map { it.toDomain() } }
+        eventDao.observeRecent(limit).withCurrentNames()
+
+    private fun Flow<List<TerritoryEventEntity>>.withCurrentNames(): Flow<List<TerritoryEvent>> =
+        combine(userDao.observeAll()) { events, users ->
+            events.map { it.toDomain() }.withCurrentNames(users.map { it.toDomain() })
+        }
 
     override suspend fun save(event: TerritoryEvent) {
         if (eventDao.getById(event.id) != null) return
