@@ -10,6 +10,7 @@ sealed class DomainException(message: String, cause: Throwable? = null) : Except
     class AlreadyInCongregation(name: String) :
         DomainException("Você já pertence à congregação \"$name\". Não é possível criar outra.")
     class NotesNotAllowed : DomainException("Somente administradores e o dirigente atual podem gerenciar anotações")
+    class InvalidCampaign : DomainException("Informe o nome e um período válido para a campanha")
     class EmptyNote : DomainException("Preencha o endereço ou a anotação")
     class InvalidCongregationCode(code: String) : DomainException("Código de congregação inválido: $code")
 }

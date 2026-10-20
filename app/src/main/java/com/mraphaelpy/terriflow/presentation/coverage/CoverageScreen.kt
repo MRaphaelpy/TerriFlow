@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -20,7 +21,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Warning
@@ -29,7 +32,10 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
@@ -60,8 +66,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mraphaelpy.terriflow.core.report.ReportFormat
 import com.mraphaelpy.terriflow.core.util.DateFormats
+import com.mraphaelpy.terriflow.domain.model.Campaign
 import com.mraphaelpy.terriflow.domain.model.ResponsibleStats
 import com.mraphaelpy.terriflow.domain.model.ServiceYearCoverage
+import com.mraphaelpy.terriflow.presentation.components.ConfirmDialog
 import com.mraphaelpy.terriflow.presentation.components.FullScreenLoading
 import com.mraphaelpy.terriflow.presentation.components.OptionSheet
 import com.mraphaelpy.terriflow.presentation.components.SheetOption
@@ -85,6 +93,41 @@ fun CoverageScreen(
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     var showExportMenu by remember { mutableStateOf(false) }
     var showSortSheet by remember { mutableStateOf(false) }
+    var showCampaignDialog by remember { mutableStateOf(false) }
+    var pendingCampaignDelete by remember { mutableStateOf<Campaign?>(null) }
+    val message by viewModel.message.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    LaunchedEffect(message) {
+        message?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearMessage()
+        }
+    }
+
+    if (showCampaignDialog) {
+        CreateCampaignDialog(
+            onCreate = { name, start, end ->
+                viewModel.createCampaign(name, start, end)
+                showCampaignDialog = false
+            },
+            onDismiss = { showCampaignDialog = false }
+        )
+    }
+
+    pendingCampaignDelete?.let { campaign ->
+        ConfirmDialog(
+            title = "Remover campanha",
+            text = "Remover \"${campaign.name}\"? Os territórios e o histórico não são afetados.",
+            confirmLabel = "Remover",
+            icon = Icons.Default.Delete,
+            onConfirm = {
+                viewModel.deleteCampaign(campaign.id)
+                pendingCampaignDelete = null
+            },
+            onDismiss = { pendingCampaignDelete = null }
+        )
+    }
 
     LaunchedEffect(shareIntent) {
         shareIntent?.let {
@@ -133,7 +176,8 @@ fun CoverageScreen(
                 },
                 scrollBehavior = scrollBehavior
             )
-        }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         if (uiState.isLoading) {
             FullScreenLoading(Modifier.padding(padding))
@@ -172,7 +216,7 @@ fun CoverageScreen(
                             onClick = { viewModel.setTab(tab) },
                             shape = SegmentedButtonDefaults.itemShape(index, CoverageTab.entries.size)
                         ) {
-                            Text(if (tab == CoverageTab.TERRITORIES) "Territórios" else "Dirigentes")
+                            Text(tab.label)
                         }
                     }
                 }
@@ -196,6 +240,33 @@ fun CoverageScreen(
                             shape = segmentShape(index, uiState.coverages.size),
                             onClick = { onNavigateToTerritory(coverage.territory.id) }
                         )
+                    }
+                }
+                CoverageTab.CAMPAIGNS -> {
+                    item(key = "new-campaign") {
+                        FilledTonalButton(onClick = { showCampaignDialog = true }, modifier = Modifier.padding(bottom = 8.dp)) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Nova campanha")
+                        }
+                    }
+                    items(uiState.campaigns, key = { it.campaign.id }) { coverage ->
+                        CampaignCard(
+                            coverage = coverage,
+                            palette = uiState.palette,
+                            onTerritoryClick = onNavigateToTerritory,
+                            onDelete = { pendingCampaignDelete = coverage.campaign },
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+                    }
+                    if (uiState.campaigns.isEmpty()) {
+                        item {
+                            Text(
+                                "Crie uma campanha (ex.: Celebração) para acompanhar quais territórios foram trabalhados no período.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
                 CoverageTab.RESPONSIBLES -> {

@@ -86,5 +86,31 @@ object TerritoryStatistics {
             .sortedWith(compareByDescending<ResponsibleStats> { it.completed }.thenBy { it.name })
     }
 
+    /** Situação de cada território dentro do período da campanha. */
+    fun campaignCoverage(
+        territories: List<Territory>,
+        periodsByTerritory: Map<String, List<AssignmentPeriod>>,
+        campaign: Campaign
+    ): CampaignCoverage {
+        val completed = mutableListOf<Territory>()
+        val inProgress = mutableListOf<Territory>()
+        val notWorked = mutableListOf<Territory>()
+        territories.forEach { territory ->
+            val periods = periodsByTerritory[territory.id].orEmpty()
+            val completedInCampaign = (periods.mapNotNull { it.completedAt } + listOfNotNull(territory.completedAt))
+                .any { it in campaign }
+            val workedInCampaign = periods.any { period ->
+                val start = period.assignedAt ?: return@any false
+                !start.after(campaign.end) && (period.endedAt?.let { !it.before(campaign.start) } ?: true)
+            }
+            when {
+                completedInCampaign -> completed += territory
+                workedInCampaign -> inProgress += territory
+                else -> notWorked += territory
+            }
+        }
+        return CampaignCoverage(campaign, completed, inProgress, notWorked)
+    }
+
     val ACTIVE_STATUSES = setOf(TerritoryStatus.ASSIGNED, TerritoryStatus.IN_PROGRESS, TerritoryStatus.PAUSED)
 }

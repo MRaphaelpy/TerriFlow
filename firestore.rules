@@ -142,6 +142,12 @@ service cloud.firestore {
         }
       }
 
+      // ── Campanhas ───────────────────────────────────────────────────
+      match /campaigns/{campaignId} {
+        allow read: if isActiveUser(congId);
+        allow create, update, delete: if isAdmin(congId);
+      }
+
       // ── Notificações ────────────────────────────────────────────────
       match /notifications/{notificationId} {
         // Cada notificação tem um destinatário: só ele (ou um admin) pode lê-la
