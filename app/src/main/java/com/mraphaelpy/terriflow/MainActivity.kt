@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -22,6 +23,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.compose.rememberNavController
 import com.mraphaelpy.terriflow.core.updater.UpdateDialog
 import com.mraphaelpy.terriflow.notification.LocalNotificationHelper
+import com.mraphaelpy.terriflow.presentation.components.LocalUserDirectory
 import com.mraphaelpy.terriflow.presentation.main.MainViewModel
 import com.mraphaelpy.terriflow.presentation.navigation.AppNavigation
 import com.mraphaelpy.terriflow.presentation.navigation.Screen
@@ -44,31 +46,34 @@ class MainActivity : ComponentActivity() {
             val appColor by viewModel.appColor.collectAsStateWithLifecycle()
             val startDestination by viewModel.startDestination.collectAsStateWithLifecycle()
             val availableUpdate by viewModel.availableUpdate.collectAsStateWithLifecycle()
+            val userDirectory by viewModel.userDirectory.collectAsStateWithLifecycle()
 
             RequestNotificationPermission()
 
             TerriFlowTheme(themeMode = themeMode, appColor = appColor) {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    startDestination?.let { destination ->
-                        val navController = rememberNavController()
-                        AppNavigation(navController = navController, startDestination = destination)
+                CompositionLocalProvider(LocalUserDirectory provides userDirectory) {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        startDestination?.let { destination ->
+                            val navController = rememberNavController()
+                            AppNavigation(navController = navController, startDestination = destination)
 
-                        LaunchedEffect(destination) {
-                            if (deepLinkTerritoryId != null && destination == Screen.Dashboard.route) {
-                                navController.navigate(Screen.TerritoryDetail.createRoute(deepLinkTerritoryId))
+                            LaunchedEffect(destination) {
+                                if (deepLinkTerritoryId != null && destination == Screen.Dashboard.route) {
+                                    navController.navigate(Screen.TerritoryDetail.createRoute(deepLinkTerritoryId))
+                                }
                             }
                         }
-                    }
 
-                    availableUpdate?.let { info ->
-                        UpdateDialog(
-                            updateInfo = info,
-                            onDismiss = viewModel::dismissUpdate,
-                            updateManager = viewModel.updateManager
-                        )
+                        availableUpdate?.let { info ->
+                            UpdateDialog(
+                                updateInfo = info,
+                                onDismiss = viewModel::dismissUpdate,
+                                updateManager = viewModel.updateManager
+                            )
+                        }
                     }
                 }
             }

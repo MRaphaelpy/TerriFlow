@@ -88,6 +88,7 @@ import com.mraphaelpy.terriflow.presentation.components.LoadingDialog
 import com.mraphaelpy.terriflow.presentation.components.TerritoryShapeBadge
 import com.mraphaelpy.terriflow.presentation.components.TerritoryStatusDisplayOrder
 import com.mraphaelpy.terriflow.presentation.components.UserAvatar
+import com.mraphaelpy.terriflow.presentation.components.UserAvatarByName
 import com.mraphaelpy.terriflow.presentation.components.eventIcon
 import com.mraphaelpy.terriflow.presentation.components.segmentedShape
 import com.mraphaelpy.terriflow.presentation.components.statusColor
@@ -522,11 +523,18 @@ private fun ActivityRow(activity: RecentActivity, color: Color, shape: Shape, on
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Text(
-                    "${event.userName} · ${DateFormats.shortDateTime().format(event.timestamp)}",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(
+                    modifier = Modifier.padding(top = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    UserAvatarByName(name = event.userName, size = 18.dp, userId = event.userId)
+                    Text(
+                        "${event.userName} · ${DateFormats.shortDateTime().format(event.timestamp)}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }

@@ -40,7 +40,8 @@ import javax.inject.Inject
 
 data class HistoryCycle(
     val responsibleName: String,
-    val events: List<TerritoryEvent>
+    val events: List<TerritoryEvent>,
+    val responsibleId: String? = null
 )
 
 data class TerritoryDetailUiState(
@@ -169,28 +170,32 @@ class TerritoryDetailViewModel @Inject constructor(
 
     private fun computeHistoryCycles(events: List<TerritoryEvent>): List<HistoryCycle> {
         val cycles = mutableListOf<HistoryCycle>()
-        var currentResponsible = "Sistema / Não atribuído"
+        var responsibleName = "Sistema / Não atribuído"
+        var responsibleId: String? = null
         var currentEvents = mutableListOf<TerritoryEvent>()
 
+        fun closeCycle() {
+            if (currentEvents.isNotEmpty()) cycles += HistoryCycle(responsibleName, currentEvents.reversed(), responsibleId)
+            currentEvents = mutableListOf()
+        }
+
         for (event in events.sortedBy { it.timestamp }) {
-            if (event.type == EventType.ASSIGNED) {
-                if (currentEvents.isNotEmpty()) {
-                    cycles.add(HistoryCycle(currentResponsible, currentEvents.reversed()))
-                    currentEvents = mutableListOf()
+            when (event.type) {
+                EventType.ASSIGNED -> {
+                    closeCycle()
+                    responsibleName = event.extra["responsibleName"] ?: event.userName
+                    responsibleId = event.extra["responsibleId"]
                 }
-                currentResponsible = event.extra["responsibleName"] ?: event.userName
-            } else if (event.type == EventType.TRANSFERRED) {
-                if (currentEvents.isNotEmpty()) {
-                    cycles.add(HistoryCycle(currentResponsible, currentEvents.reversed()))
-                    currentEvents = mutableListOf()
+                EventType.TRANSFERRED -> {
+                    closeCycle()
+                    responsibleName = event.extra["toUserName"] ?: event.userName
+                    responsibleId = event.extra["toUserId"]
                 }
-                currentResponsible = event.extra["toUserName"] ?: event.userName
+                else -> Unit
             }
             currentEvents.add(event)
         }
-        if (currentEvents.isNotEmpty()) {
-            cycles.add(HistoryCycle(currentResponsible, currentEvents.reversed()))
-        }
+        closeCycle()
         return cycles.reversed()
     }
 

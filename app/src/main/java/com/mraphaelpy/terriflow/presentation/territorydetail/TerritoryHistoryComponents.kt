@@ -164,7 +164,7 @@ internal fun HistoryCycleCard(cycle: HistoryCycle) {
     ) {
         Column(modifier = Modifier.padding(20.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 16.dp)) {
-                com.mraphaelpy.terriflow.presentation.components.UserAvatarByName(name = cycle.responsibleName, size = 40.dp)
+                com.mraphaelpy.terriflow.presentation.components.UserAvatarByName(name = cycle.responsibleName, size = 40.dp, userId = cycle.responsibleId)
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text(
@@ -218,7 +218,7 @@ private fun TimelineEventItem(event: TerritoryEvent) {
         Column {
             Text(event.type.label(), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
-                com.mraphaelpy.terriflow.presentation.components.UserAvatarByName(name = event.userName, size = 16.dp)
+                com.mraphaelpy.terriflow.presentation.components.UserAvatarByName(name = event.userName, size = 16.dp, userId = event.userId)
                 Text(event.userName, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("•", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(formatter.format(event.timestamp), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -9,6 +9,9 @@ import com.mraphaelpy.terriflow.domain.repository.AuthRepository
 import com.mraphaelpy.terriflow.domain.repository.CongregationRepository
 import com.mraphaelpy.terriflow.domain.repository.SettingsRepository
 import com.mraphaelpy.terriflow.domain.repository.ThemeMode
+import com.mraphaelpy.terriflow.domain.repository.UserRepository
+import com.mraphaelpy.terriflow.domain.model.User
+import kotlinx.coroutines.flow.map
 import com.mraphaelpy.terriflow.presentation.navigation.Screen
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,8 +27,13 @@ class MainViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val congregationRepository: CongregationRepository,
     val updateManager: AppUpdateManager,
-    settingsRepository: SettingsRepository
+    settingsRepository: SettingsRepository,
+    userRepository: UserRepository
 ) : ViewModel() {
+
+    val userDirectory: StateFlow<Map<String, User>> = userRepository.observeAll()
+        .map { users -> users.associateBy { it.id } }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyMap())
 
     val themeMode: StateFlow<ThemeMode> =
         settingsRepository.themeMode.stateIn(viewModelScope, SharingStarted.Eagerly, ThemeMode.SYSTEM)

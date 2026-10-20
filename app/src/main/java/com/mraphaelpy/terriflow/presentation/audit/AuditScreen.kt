@@ -65,6 +65,7 @@ import com.mraphaelpy.terriflow.presentation.components.OptionSheet
 import com.mraphaelpy.terriflow.presentation.components.SheetOption
 import com.mraphaelpy.terriflow.presentation.components.TerritoryShapeBadge
 import com.mraphaelpy.terriflow.presentation.components.UserAvatar
+import com.mraphaelpy.terriflow.presentation.components.UserAvatarByName
 import com.mraphaelpy.terriflow.presentation.components.eventIcon
 import com.mraphaelpy.terriflow.presentation.components.segmentedShape
 
@@ -288,7 +289,10 @@ private fun AuditItem(entry: AuditEntry, color: Color, shape: RoundedCornerShape
                 changes.forEach { change ->
                     Text(change, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                Text("por ${event.userName}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    UserAvatarByName(name = event.userName, size = 18.dp, userId = event.userId)
+                    Text("por ${event.userName}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
     }

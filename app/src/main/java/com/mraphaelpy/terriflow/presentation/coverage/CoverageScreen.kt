@@ -372,7 +372,7 @@ private fun ResponsibleRow(stats: ResponsibleStats, shape: RoundedCornerShape) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            UserAvatarByName(name = stats.name, size = 40.dp)
+            UserAvatarByName(name = stats.name, size = 40.dp, userId = stats.responsibleId)
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(stats.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 Text(
