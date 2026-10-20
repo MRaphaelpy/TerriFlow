@@ -21,5 +21,5 @@ interface TerritoryRepository {
 
     suspend fun delete(id: String)
 
-    suspend fun updateResponsibleProfile(user: User): Int
+    suspend fun updateResponsibleName(user: User): Int
 }

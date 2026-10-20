@@ -78,7 +78,6 @@ class CompleteTerritoryUseCase @Inject constructor(
                 status = TerritoryStatus.ASSIGNED,
                 currentResponsibleId = nextResponsible.id,
                 currentResponsibleName = nextResponsible.name,
-                currentResponsiblePhotoUrl = nextResponsible.photoUrl,
                 pastResponsibleIds = (pastResponsibleIds + nextResponsible.id).distinct(),
                 assignedAt = now,
                 startedAt = null,

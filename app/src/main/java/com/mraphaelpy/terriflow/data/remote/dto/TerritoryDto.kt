@@ -16,7 +16,6 @@ data class TerritoryDto(
     val status: String = "AVAILABLE",
     val currentResponsibleId: String? = null,
     val currentResponsibleName: String? = null,
-    val currentResponsiblePhotoUrl: String? = null,
     val createdAt: Timestamp = Timestamp.now(),
     val assignedAt: Timestamp? = null,
     val startedAt: Timestamp? = null,
@@ -41,7 +40,6 @@ data class TerritoryDto(
         status = runCatching { TerritoryStatus.valueOf(status) }.getOrDefault(TerritoryStatus.AVAILABLE),
         currentResponsibleId = currentResponsibleId,
         currentResponsibleName = currentResponsibleName,
-        currentResponsiblePhotoUrl = currentResponsiblePhotoUrl,
         createdAt = createdAt.toDate(),
         assignedAt = assignedAt?.toDate(),
         startedAt = startedAt?.toDate(),
@@ -78,7 +76,7 @@ data class TerritoryDto(
         put("status", status)
         put("currentResponsibleId", currentResponsibleId)
         put("currentResponsibleName", currentResponsibleName)
-        put("currentResponsiblePhotoUrl", currentResponsiblePhotoUrl)
+        put("currentResponsiblePhotoUrl", null)
         put("createdAt", createdAt)
         put("assignedAt", assignedAt)
         put("startedAt", startedAt)
@@ -107,7 +105,6 @@ data class TerritoryDto(
                 status = doc.getString("status") ?: "AVAILABLE",
                 currentResponsibleId = doc.getString("currentResponsibleId"),
                 currentResponsibleName = doc.getString("currentResponsibleName"),
-                currentResponsiblePhotoUrl = doc.getString("currentResponsiblePhotoUrl"),
                 createdAt = doc.getTimestamp("createdAt") ?: Timestamp.now(),
                 assignedAt = doc.getTimestamp("assignedAt"),
                 startedAt = doc.getTimestamp("startedAt"),
@@ -147,7 +144,6 @@ data class TerritoryDto(
             status = t.status.name,
             currentResponsibleId = t.currentResponsibleId,
             currentResponsibleName = t.currentResponsibleName,
-            currentResponsiblePhotoUrl = t.currentResponsiblePhotoUrl,
             createdAt = Timestamp(t.createdAt),
             assignedAt = t.assignedAt?.let { Timestamp(it) },
             startedAt = t.startedAt?.let { Timestamp(it) },

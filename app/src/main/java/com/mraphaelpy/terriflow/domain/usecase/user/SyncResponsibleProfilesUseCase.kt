@@ -14,6 +14,6 @@ class SyncResponsibleProfilesUseCase @Inject constructor(
     suspend operator fun invoke(): Int {
         val me = authRepository.getCurrentUser() ?: return 0
         val users = if (me.isAdmin) userRepository.observeAll().first() else listOf(me)
-        return users.sumOf { territoryRepository.updateResponsibleProfile(it) }
+        return users.sumOf { territoryRepository.updateResponsibleName(it) }
     }
 }

@@ -19,6 +19,6 @@ class RenameUserUseCase @Inject constructor(
         } else {
             userRepository.updateUserName(userId, trimmed)
         }
-        userRepository.getById(userId)?.let { territoryRepository.updateResponsibleProfile(it) }
+        userRepository.getById(userId)?.let { territoryRepository.updateResponsibleName(it) }
     }
 }

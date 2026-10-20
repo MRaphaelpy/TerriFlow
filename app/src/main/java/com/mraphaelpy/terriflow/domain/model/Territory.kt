@@ -32,7 +32,6 @@ data class Territory(
     val status: TerritoryStatus = TerritoryStatus.AVAILABLE,
     val currentResponsibleId: String? = null,
     val currentResponsibleName: String? = null,
-    val currentResponsiblePhotoUrl: String? = null,
     val createdAt: Date = Date(),
     val assignedAt: Date? = null,
     val startedAt: Date? = null,

@@ -29,7 +29,7 @@ class ResponsibleProfileUseCasesTest {
         RenameUserUseCase(authRepository, userRepository, territoryRepository)(publisher.id, "  Novo Nome ")
 
         coVerify { authRepository.updateName("Novo Nome") }
-        coVerify { territoryRepository.updateResponsibleProfile(renamed) }
+        coVerify { territoryRepository.updateResponsibleName(renamed) }
     }
 
     @Test
@@ -41,7 +41,7 @@ class ResponsibleProfileUseCasesTest {
 
         coVerify { userRepository.updateUserName(publisher.id, "Outro") }
         coVerify(exactly = 0) { authRepository.updateName(any()) }
-        coVerify { territoryRepository.updateResponsibleProfile(publisher) }
+        coVerify { territoryRepository.updateResponsibleName(publisher) }
     }
 
     @Test
@@ -51,7 +51,7 @@ class ResponsibleProfileUseCasesTest {
 
         SyncResponsibleProfilesUseCase(authRepository, userRepository, territoryRepository)()
 
-        coVerify(exactly = 3) { territoryRepository.updateResponsibleProfile(any()) }
+        coVerify(exactly = 3) { territoryRepository.updateResponsibleName(any()) }
     }
 
     @Test
@@ -60,6 +60,6 @@ class ResponsibleProfileUseCasesTest {
 
         SyncResponsibleProfilesUseCase(authRepository, userRepository, territoryRepository)()
 
-        coVerify(exactly = 1) { territoryRepository.updateResponsibleProfile(publisher) }
+        coVerify(exactly = 1) { territoryRepository.updateResponsibleName(publisher) }
     }
 }

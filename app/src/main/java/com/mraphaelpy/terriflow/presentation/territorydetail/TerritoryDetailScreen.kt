@@ -349,7 +349,7 @@ private fun HeroCard(territory: Territory, color: Color, isMine: Boolean) {
                 ) {
                     val name = territory.currentResponsibleName
                     if (name != null) {
-                        UserAvatarByName(name = name, photoUrl = territory.currentResponsiblePhotoUrl, size = 40.dp, userId = territory.currentResponsibleId)
+                        UserAvatarByName(name = name, size = 40.dp, userId = territory.currentResponsibleId)
                     } else {
                         Box(
                             modifier = Modifier

@@ -98,16 +98,15 @@ class TerritoryRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun updateResponsibleProfile(user: User): Int {
+    override suspend fun updateResponsibleName(user: User): Int {
         val outdated = territoryDao.getByResponsible(user.id)
             .map { it.toDomain() }
-            .filter { it.currentResponsibleName != user.name || it.currentResponsiblePhotoUrl != user.photoUrl }
+            .filter { it.currentResponsibleName != user.name }
         val now = Date()
         outdated.forEach { territory ->
             save(
                 territory.copy(
                     currentResponsibleName = user.name,
-                    currentResponsiblePhotoUrl = user.photoUrl,
                     updatedAt = now
                 )
             )

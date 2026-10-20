@@ -368,7 +368,7 @@ private fun ResponsibleLine(territory: Territory) {
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         if (name != null) {
-            UserAvatarByName(name = name, photoUrl = territory.currentResponsiblePhotoUrl, size = 20.dp, userId = territory.currentResponsibleId)
+            UserAvatarByName(name = name, size = 20.dp, userId = territory.currentResponsibleId)
             Text(
                 name,
                 style = MaterialTheme.typography.labelLarge,

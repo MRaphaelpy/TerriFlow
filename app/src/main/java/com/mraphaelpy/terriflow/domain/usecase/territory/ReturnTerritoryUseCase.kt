@@ -30,7 +30,6 @@ class ReturnTerritoryUseCase @Inject constructor(
                 pastResponsibleIds = (territory.pastResponsibleIds + listOfNotNull(territory.currentResponsibleId)).distinct(),
                 currentResponsibleId = null,
                 currentResponsibleName = null,
-                currentResponsiblePhotoUrl = null,
                 returnedAt = now,
                 updatedAt = now
             )
