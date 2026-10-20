@@ -5,7 +5,6 @@ import com.mraphaelpy.terriflow.domain.repository.AuthRepository
 import com.mraphaelpy.terriflow.domain.repository.NotificationRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
 import com.mraphaelpy.terriflow.testutil.Fixtures
-import com.mraphaelpy.terriflow.testutil.Fixtures.otherPublisher
 import com.mraphaelpy.terriflow.testutil.Fixtures.publisher
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -27,55 +26,43 @@ class CheckStaleTerritoriesUseCaseTest {
 
     init {
         every { authRepository.currentUserId } returns publisher.id
-        coEvery { territoryRepository.getInProgress() } returns emptyList()
-    }
-
-    @Test
-    fun `avisa apenas sobre os territorios do proprio usuario`() = runTest {
-        coEvery { territoryRepository.getAssignedNotStarted() } returns listOf(
-            Fixtures.territory(TerritoryStatus.ASSIGNED, publisher, assignedAt = Fixtures.daysAgo(10, now)),
-            Fixtures.territory(TerritoryStatus.ASSIGNED, otherPublisher, assignedAt = Fixtures.daysAgo(10, now))
-                .copy(id = "t2")
-        )
         coEvery { notificationRepository.exists(any()) } returns false
+    }
 
-        val created = useCase(now)
+    private fun mine(status: TerritoryStatus, assignedDaysAgo: Long, started: Boolean = status != TerritoryStatus.ASSIGNED) =
+        Fixtures.territory(
+            status,
+            publisher,
+            assignedAt = Fixtures.daysAgo(assignedDaysAgo, now),
+            startedAt = if (started) Fixtures.daysAgo(assignedDaysAgo - 1, now) else null
+        )
 
-        assertEquals(listOf("t1"), created.map { it.territoryId })
-        assertEquals(publisher.id, created.single().userId)
+    @Test
+    fun `lembra aos 2 e aos 4 meses com ids diferentes`() = runTest {
+        coEvery { territoryRepository.getByResponsible(publisher.id) } returns listOf(mine(TerritoryStatus.IN_PROGRESS, 65))
+        val twoMonths = useCase(now).single()
+        assertTrue(twoMonths.title.contains("2 meses"))
+
+        coEvery { territoryRepository.getByResponsible(publisher.id) } returns listOf(mine(TerritoryStatus.IN_PROGRESS, 125))
+        val fourMonths = useCase(now).single()
+        assertTrue(fourMonths.title.contains("4 meses"))
+        assertTrue(twoMonths.id != fourMonths.id)
     }
 
     @Test
-    fun `nao repete o lembrete que ja existe`() = runTest {
-        coEvery { territoryRepository.getAssignedNotStarted() } returns listOf(
-            Fixtures.territory(TerritoryStatus.ASSIGNED, publisher, assignedAt = Fixtures.daysAgo(10, now))
-        )
-        coEvery { notificationRepository.exists(any()) } returns true
+    fun `avisa territorio designado e nao iniciado`() = runTest {
+        coEvery { territoryRepository.getByResponsible(publisher.id) } returns listOf(mine(TerritoryStatus.ASSIGNED, 8))
+        assertEquals("Território aguardando início", useCase(now).single().title)
+    }
 
+    @Test
+    fun `nao repete lembrete ja enviado nem avisa dentro do prazo`() = runTest {
+        coEvery { territoryRepository.getByResponsible(publisher.id) } returns listOf(mine(TerritoryStatus.IN_PROGRESS, 30))
+        assertTrue(useCase(now).isEmpty())
+
+        coEvery { territoryRepository.getByResponsible(publisher.id) } returns listOf(mine(TerritoryStatus.IN_PROGRESS, 70))
+        coEvery { notificationRepository.exists(any()) } returns true
         assertTrue(useCase(now).isEmpty())
         coVerify(exactly = 0) { notificationRepository.save(any()) }
-    }
-
-    @Test
-    fun `gera o mesmo id dentro da mesma semana`() = runTest {
-        val territory = Fixtures.territory(TerritoryStatus.ASSIGNED, publisher, assignedAt = Fixtures.daysAgo(8, now))
-        coEvery { territoryRepository.getAssignedNotStarted() } returns listOf(territory)
-        coEvery { notificationRepository.exists(any()) } returns false
-
-        val first = useCase(now).single().id
-        val sameWeek = useCase(Date(now.time + 2 * 24 * 60 * 60 * 1000)).single().id
-        val nextWeek = useCase(Date(now.time + 7 * 24 * 60 * 60 * 1000)).single().id
-
-        assertEquals(first, sameWeek)
-        assertTrue(first != nextWeek)
-    }
-
-    @Test
-    fun `ignora territorios dentro do prazo`() = runTest {
-        coEvery { territoryRepository.getAssignedNotStarted() } returns listOf(
-            Fixtures.territory(TerritoryStatus.ASSIGNED, publisher, assignedAt = Fixtures.daysAgo(2, now))
-        )
-
-        assertTrue(useCase(now).isEmpty())
     }
 }

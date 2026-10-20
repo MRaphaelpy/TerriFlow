@@ -14,6 +14,9 @@ import com.mraphaelpy.terriflow.domain.repository.NotificationRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryEventRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
 import com.mraphaelpy.terriflow.domain.repository.UserRepository
+import com.mraphaelpy.terriflow.domain.model.TerritoryStatistics
+import com.mraphaelpy.terriflow.domain.usecase.notification.CheckStaleTerritoriesUseCase
+import com.mraphaelpy.terriflow.domain.usecase.notification.RemindResponsibleUseCase
 import com.mraphaelpy.terriflow.domain.usecase.user.RenameUserUseCase
 import com.mraphaelpy.terriflow.domain.usecase.user.SyncResponsibleProfilesUseCase
 import com.mraphaelpy.terriflow.domain.usecase.user.UpdateProfilePhotoUseCase
@@ -46,7 +49,8 @@ data class DashboardUiState(
     val palette: Map<String, Color> = emptyMap(),
     val unreadCount: Int = 0,
     val isLoggingOut: Boolean = false,
-    val isRefreshing: Boolean = false
+    val isRefreshing: Boolean = false,
+    val message: String? = null
 ) {
     val isAdmin: Boolean get() = currentUser?.isAdmin == true
 }
@@ -62,7 +66,8 @@ class DashboardViewModel @Inject constructor(
     private val photoEncoder: ProfilePhotoEncoder,
     private val renameUser: RenameUserUseCase,
     private val updateProfilePhoto: UpdateProfilePhotoUseCase,
-    private val syncResponsibleProfiles: SyncResponsibleProfilesUseCase
+    private val syncResponsibleProfiles: SyncResponsibleProfilesUseCase,
+    private val remindResponsible: RemindResponsibleUseCase
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DashboardUiState())
@@ -103,6 +108,16 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch { runCatching { renameUser(userId, newName) } }
     }
 
+    fun remind(territoryId: String) {
+        viewModelScope.launch {
+            val message = runCatching { remindResponsible(territoryId) }
+                .fold(onSuccess = { "Pedido enviado ao dirigente" }, onFailure = { it.message ?: "Não foi possível enviar" })
+            _uiState.update { it.copy(message = message) }
+        }
+    }
+
+    fun clearMessage() = _uiState.update { it.copy(message = null) }
+
     private suspend fun syncFromRemote() {
         runCatching { userRepository.syncFromRemote() }
         runCatching { territoryRepository.syncFromRemote() }
@@ -141,8 +156,8 @@ class DashboardViewModel @Inject constructor(
     private fun overdue(territories: List<Territory>): List<Territory> {
         val now = Date().time
         return territories.filter { territory ->
-            if (territory.status != TerritoryStatus.IN_PROGRESS) return@filter false
-            val since = territory.startedAt?.time ?: territory.assignedAt?.time ?: return@filter false
+            if (territory.status !in TerritoryStatistics.ACTIVE_STATUSES) return@filter false
+            val since = territory.assignedAt?.time ?: return@filter false
             TimeUnit.MILLISECONDS.toDays(now - since) > OVERDUE_DAYS
         }
     }
@@ -152,6 +167,6 @@ class DashboardViewModel @Inject constructor(
         val MY_TERRITORY_ORDER = listOf(
             TerritoryStatus.IN_PROGRESS, TerritoryStatus.PAUSED, TerritoryStatus.ASSIGNED, TerritoryStatus.COMPLETED
         )
-        const val OVERDUE_DAYS = 90
+        val OVERDUE_DAYS = CheckStaleTerritoriesUseCase.WORKING_MILESTONES.last()
     }
 }

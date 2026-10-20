@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PlayArrow
@@ -193,22 +194,34 @@ fun TerritoryDetailScreen(
                             Icon(Icons.Default.Edit, contentDescription = "Editar")
                         }
                     }
-                    if (uiState.can(TerritoryAction.DELETE)) {
+                    if (uiState.can(TerritoryAction.DELETE) || uiState.can(TerritoryAction.REMIND)) {
                         Box {
                             IconButton(onClick = { showOverflow = true }) {
                                 Icon(Icons.Default.MoreVert, contentDescription = "Mais opções")
                             }
                             DropdownMenu(expanded = showOverflow, onDismissRequest = { showOverflow = false }) {
-                                DropdownMenuItem(
-                                    text = { Text("Apagar território", color = MaterialTheme.colorScheme.error) },
-                                    leadingIcon = {
-                                        Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                                    },
-                                    onClick = {
-                                        showOverflow = false
-                                        showDeleteDialog = true
-                                    }
-                                )
+                                if (uiState.can(TerritoryAction.REMIND)) {
+                                    DropdownMenuItem(
+                                        text = { Text("Cobrar devolução") },
+                                        leadingIcon = { Icon(Icons.Default.NotificationsActive, contentDescription = null) },
+                                        onClick = {
+                                            showOverflow = false
+                                            viewModel.remind()
+                                        }
+                                    )
+                                }
+                                if (uiState.can(TerritoryAction.DELETE)) {
+                                    DropdownMenuItem(
+                                        text = { Text("Apagar território", color = MaterialTheme.colorScheme.error) },
+                                        leadingIcon = {
+                                            Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                        },
+                                        onClick = {
+                                            showOverflow = false
+                                            showDeleteDialog = true
+                                        }
+                                    )
+                                }
                             }
                         }
                     }

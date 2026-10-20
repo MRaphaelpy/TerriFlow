@@ -19,6 +19,7 @@ interface TerritoryRepository {
     suspend fun syncFromRemote()
     suspend fun getAssignedNotStarted(): List<Territory>
     suspend fun getInProgress(): List<Territory>
+    suspend fun getByResponsible(userId: String): List<Territory>
 
     suspend fun delete(id: String)
 

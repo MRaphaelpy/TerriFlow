@@ -12,6 +12,7 @@ object TerritoryActionPolicy {
     )
     private val startableStatuses = setOf(TerritoryStatus.ASSIGNED, TerritoryStatus.PAUSED)
     private val completableStatuses = setOf(TerritoryStatus.IN_PROGRESS, TerritoryStatus.PAUSED)
+    private val remindableStatuses = setOf(TerritoryStatus.ASSIGNED, TerritoryStatus.IN_PROGRESS, TerritoryStatus.PAUSED)
     private val returnableStatuses = setOf(
         TerritoryStatus.ASSIGNED, TerritoryStatus.IN_PROGRESS, TerritoryStatus.PAUSED, TerritoryStatus.COMPLETED
     )
@@ -28,6 +29,8 @@ object TerritoryActionPolicy {
             TerritoryAction.PAUSE -> canOperate && status == TerritoryStatus.IN_PROGRESS
             TerritoryAction.COMPLETE -> canOperate && status in completableStatuses
             TerritoryAction.RETURN -> canOperate && status in returnableStatuses
+            TerritoryAction.REMIND -> isAdmin && status in remindableStatuses &&
+                territory.currentResponsibleId != null && territory.currentResponsibleId != user.id
             TerritoryAction.CREATE, TerritoryAction.EDIT, TerritoryAction.DELETE -> isAdmin
         }
     }

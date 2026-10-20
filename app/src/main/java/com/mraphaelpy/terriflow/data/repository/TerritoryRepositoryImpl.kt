@@ -87,6 +87,9 @@ class TerritoryRepositoryImpl @Inject constructor(
     override suspend fun getInProgress(): List<Territory> =
         territoryDao.getInProgress().map { it.toDomain() }
 
+    override suspend fun getByResponsible(userId: String): List<Territory> =
+        territoryDao.getByResponsible(userId).map { it.toDomain() }
+
     override suspend fun delete(id: String) {
         merger.removeLocally(id)
         val congregationId = congregationRepository.getCurrentCongregationId() ?: return

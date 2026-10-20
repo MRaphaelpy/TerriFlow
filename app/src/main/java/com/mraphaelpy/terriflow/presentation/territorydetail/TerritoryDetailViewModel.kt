@@ -16,6 +16,7 @@ import com.mraphaelpy.terriflow.domain.repository.AuthRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryEventRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
 import com.mraphaelpy.terriflow.domain.repository.UserRepository
+import com.mraphaelpy.terriflow.domain.usecase.notification.RemindResponsibleUseCase
 import com.mraphaelpy.terriflow.domain.usecase.territory.AssignTerritoryUseCase
 import com.mraphaelpy.terriflow.domain.usecase.territory.CompleteTerritoryUseCase
 import com.mraphaelpy.terriflow.domain.usecase.territory.DeleteTerritoryUseCase
@@ -72,7 +73,8 @@ class TerritoryDetailViewModel @Inject constructor(
     private val pauseTerritory: PauseTerritoryUseCase,
     private val completeTerritory: CompleteTerritoryUseCase,
     private val returnTerritory: ReturnTerritoryUseCase,
-    private val deleteTerritory: DeleteTerritoryUseCase
+    private val deleteTerritory: DeleteTerritoryUseCase,
+    private val remindResponsible: RemindResponsibleUseCase
 ) : ViewModel() {
 
     private val territoryId: String = checkNotNull(savedStateHandle["territoryId"])
@@ -190,6 +192,11 @@ class TerritoryDetailViewModel @Inject constructor(
     fun returnTerritory() = performAction {
         returnTerritory(territoryId)
         _uiState.update { it.copy(actionSuccess = "Território devolvido") }
+    }
+
+    fun remind() = performAction {
+        remindResponsible(territoryId)
+        _uiState.update { it.copy(actionSuccess = "Pedido enviado ao dirigente") }
     }
 
     fun delete() = performAction {

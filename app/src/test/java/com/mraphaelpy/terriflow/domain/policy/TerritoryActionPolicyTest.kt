@@ -63,4 +63,12 @@ class TerritoryActionPolicyTest {
         assertTrue(TerritoryActionPolicy.canCreate(admin))
         assertFalse(TerritoryActionPolicy.canCreate(publisher))
     }
+
+    @Test
+    fun `apenas admin cobra o dirigente de territorio ativo de outra pessoa`() {
+        val t = territory(TerritoryStatus.IN_PROGRESS, responsible = publisher)
+        assertTrue(TerritoryActionPolicy.canPerform(admin, t, TerritoryAction.REMIND))
+        assertFalse(TerritoryActionPolicy.canPerform(publisher, t, TerritoryAction.REMIND))
+        assertFalse(TerritoryActionPolicy.canPerform(admin, territory(TerritoryStatus.COMPLETED, responsible = publisher), TerritoryAction.REMIND))
+    }
 }

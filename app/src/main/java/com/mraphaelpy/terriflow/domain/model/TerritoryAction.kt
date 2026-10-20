@@ -1,6 +1,6 @@
 package com.mraphaelpy.terriflow.domain.model
 
-enum class TerritoryAction { CREATE, ASSIGN, START, PAUSE, COMPLETE, RETURN, EDIT, DELETE }
+enum class TerritoryAction { CREATE, ASSIGN, START, PAUSE, COMPLETE, RETURN, REMIND, EDIT, DELETE }
 
 fun TerritoryAction.label(): String = when (this) {
     TerritoryAction.CREATE -> "criar território"
@@ -9,6 +9,7 @@ fun TerritoryAction.label(): String = when (this) {
     TerritoryAction.PAUSE -> "pausar trabalho"
     TerritoryAction.COMPLETE -> "finalizar território"
     TerritoryAction.RETURN -> "devolver território"
+    TerritoryAction.REMIND -> "cobrar dirigente"
     TerritoryAction.EDIT -> "editar território"
     TerritoryAction.DELETE -> "apagar território"
 }
