@@ -266,6 +266,15 @@ fun TerritoryDetailScreen(
 
             TerritoryInfoGroup(territory)
 
+            if (uiState.canAccessNotes) {
+                TerritoryNotesSection(
+                    notes = uiState.notes,
+                    canDelete = uiState::canDelete,
+                    onAdd = viewModel::addNote,
+                    onDelete = viewModel::deleteNote
+                )
+            }
+
             TerritoryMiniMap(
                 lat = territory.latitude,
                 lng = territory.longitude,

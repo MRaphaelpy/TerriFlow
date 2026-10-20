@@ -9,13 +9,18 @@ import com.mraphaelpy.terriflow.domain.model.ResponsibleRotationInfo
 import com.mraphaelpy.terriflow.domain.model.Territory
 import com.mraphaelpy.terriflow.domain.model.TerritoryAction
 import com.mraphaelpy.terriflow.domain.model.TerritoryEvent
+import com.mraphaelpy.terriflow.domain.model.TerritoryNote
+import com.mraphaelpy.terriflow.domain.model.TerritoryNoteKind
 import com.mraphaelpy.terriflow.domain.model.TerritoryRotationHelper
 import com.mraphaelpy.terriflow.domain.model.User
 import com.mraphaelpy.terriflow.domain.policy.TerritoryActionPolicy
 import com.mraphaelpy.terriflow.domain.repository.AuthRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryEventRepository
+import com.mraphaelpy.terriflow.domain.repository.TerritoryNoteRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
 import com.mraphaelpy.terriflow.domain.repository.UserRepository
+import com.mraphaelpy.terriflow.domain.usecase.note.AddTerritoryNoteUseCase
+import com.mraphaelpy.terriflow.domain.usecase.note.DeleteTerritoryNoteUseCase
 import com.mraphaelpy.terriflow.domain.usecase.notification.RemindResponsibleUseCase
 import com.mraphaelpy.terriflow.domain.usecase.territory.AssignTerritoryUseCase
 import com.mraphaelpy.terriflow.domain.usecase.territory.CompleteTerritoryUseCase
@@ -51,8 +56,14 @@ data class TerritoryDetailUiState(
     val rotationInfo: List<ResponsibleRotationInfo> = emptyList(),
     val pastWorkers: List<ResponsibleRotationInfo> = emptyList(),
     val suggestedWorkers: List<ResponsibleRotationInfo> = emptyList(),
-    val historyCycles: List<HistoryCycle> = emptyList()
+    val historyCycles: List<HistoryCycle> = emptyList(),
+    val notes: List<TerritoryNote> = emptyList()
 ) {
+    val canAccessNotes: Boolean
+        get() = territory?.let { TerritoryActionPolicy.canAccessNotes(currentUser, it) } == true
+
+    fun canDelete(note: TerritoryNote): Boolean = TerritoryActionPolicy.canDeleteNote(currentUser, note)
+
     val isAdmin: Boolean get() = currentUser?.isAdmin == true
 
     val allowedActions: Set<TerritoryAction>
@@ -74,7 +85,10 @@ class TerritoryDetailViewModel @Inject constructor(
     private val completeTerritory: CompleteTerritoryUseCase,
     private val returnTerritory: ReturnTerritoryUseCase,
     private val deleteTerritory: DeleteTerritoryUseCase,
-    private val remindResponsible: RemindResponsibleUseCase
+    private val remindResponsible: RemindResponsibleUseCase,
+    private val noteRepository: TerritoryNoteRepository,
+    private val addTerritoryNote: AddTerritoryNoteUseCase,
+    private val deleteTerritoryNote: DeleteTerritoryNoteUseCase
 ) : ViewModel() {
 
     private val territoryId: String = checkNotNull(savedStateHandle["territoryId"])
@@ -118,6 +132,11 @@ class TerritoryDetailViewModel @Inject constructor(
         }
         viewModelScope.launch {
             runCatching { eventRepository.syncFromRemote(territoryId) }
+        }
+        viewModelScope.launch {
+            noteRepository.observeByTerritory(territoryId).collect { notes ->
+                _uiState.update { it.copy(notes = notes) }
+            }
         }
     }
 
@@ -196,6 +215,16 @@ class TerritoryDetailViewModel @Inject constructor(
     fun returnTerritory() = performAction {
         returnTerritory(territoryId)
         _uiState.update { it.copy(actionSuccess = "Território devolvido") }
+    }
+
+    fun addNote(kind: TerritoryNoteKind, address: String, text: String) = performAction {
+        addTerritoryNote(territoryId, kind, address, text)
+        _uiState.update { it.copy(actionSuccess = "Anotação salva") }
+    }
+
+    fun deleteNote(note: TerritoryNote) = performAction {
+        deleteTerritoryNote(note)
+        _uiState.update { it.copy(actionSuccess = "Anotação removida") }
     }
 
     fun remind() = performAction {

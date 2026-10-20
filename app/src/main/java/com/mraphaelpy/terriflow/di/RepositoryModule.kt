@@ -5,6 +5,7 @@ import com.mraphaelpy.terriflow.data.repository.CongregationRepositoryImpl
 import com.mraphaelpy.terriflow.data.repository.NotificationRepositoryImpl
 import com.mraphaelpy.terriflow.data.repository.SettingsRepositoryImpl
 import com.mraphaelpy.terriflow.data.repository.TerritoryEventRepositoryImpl
+import com.mraphaelpy.terriflow.data.repository.TerritoryNoteRepositoryImpl
 import com.mraphaelpy.terriflow.data.repository.TerritoryRepositoryImpl
 import com.mraphaelpy.terriflow.data.repository.UserRepositoryImpl
 import com.mraphaelpy.terriflow.domain.repository.AuthRepository
@@ -12,6 +13,7 @@ import com.mraphaelpy.terriflow.domain.repository.CongregationRepository
 import com.mraphaelpy.terriflow.domain.repository.NotificationRepository
 import com.mraphaelpy.terriflow.domain.repository.SettingsRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryEventRepository
+import com.mraphaelpy.terriflow.domain.repository.TerritoryNoteRepository
 import com.mraphaelpy.terriflow.domain.repository.TerritoryRepository
 import com.mraphaelpy.terriflow.domain.repository.UserRepository
 import dagger.Binds
@@ -41,6 +43,9 @@ abstract class RepositoryModule {
 
     @Binds @Singleton
     abstract fun bindSettingsRepository(impl: SettingsRepositoryImpl): SettingsRepository
+
+    @Binds @Singleton
+    abstract fun bindTerritoryNoteRepository(impl: TerritoryNoteRepositoryImpl): TerritoryNoteRepository
 
     @Binds @Singleton
     abstract fun bindCongregationRepository(impl: CongregationRepositoryImpl): CongregationRepository

@@ -5,6 +5,7 @@ import com.mraphaelpy.terriflow.data.local.dao.TerritoryDao
 import com.mraphaelpy.terriflow.data.local.entity.TerritoryEntity
 import com.mraphaelpy.terriflow.data.remote.RemoteWriter
 import com.mraphaelpy.terriflow.data.remote.source.FirestoreEventSource
+import com.mraphaelpy.terriflow.data.remote.source.FirestoreNoteSource
 import com.mraphaelpy.terriflow.data.remote.source.FirestoreTerritorySource
 import com.mraphaelpy.terriflow.data.sync.TerritoryRemoteMerger
 import com.mraphaelpy.terriflow.di.ApplicationScope
@@ -27,6 +28,7 @@ class TerritoryRepositoryImpl @Inject constructor(
     private val territoryDao: TerritoryDao,
     private val remoteSource: FirestoreTerritorySource,
     private val remoteEventSource: FirestoreEventSource,
+    private val remoteNoteSource: FirestoreNoteSource,
     private val remoteWriter: RemoteWriter,
     private val merger: TerritoryRemoteMerger,
     private val congregationRepository: CongregationRepository,
@@ -96,6 +98,7 @@ class TerritoryRepositoryImpl @Inject constructor(
         appScope.launch {
             runCatching {
                 remoteEventSource.deleteAllByTerritory(congregationId, id)
+                remoteNoteSource.deleteAllByTerritory(congregationId, id)
                 remoteSource.delete(congregationId, id)
             }.onFailure { Log.e(TAG, "Falha ao apagar território $id no servidor", it) }
         }

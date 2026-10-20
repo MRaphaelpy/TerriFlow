@@ -2,6 +2,7 @@ package com.mraphaelpy.terriflow.domain.policy
 
 import com.mraphaelpy.terriflow.domain.model.Territory
 import com.mraphaelpy.terriflow.domain.model.TerritoryAction
+import com.mraphaelpy.terriflow.domain.model.TerritoryNote
 import com.mraphaelpy.terriflow.domain.model.TerritoryStatus
 import com.mraphaelpy.terriflow.domain.model.User
 
@@ -34,6 +35,13 @@ object TerritoryActionPolicy {
             TerritoryAction.CREATE, TerritoryAction.EDIT, TerritoryAction.DELETE -> isAdmin
         }
     }
+
+    /** Anotações (inclusive "não visitar") são restritas a admins e ao dirigente atual. */
+    fun canAccessNotes(user: User?, territory: Territory): Boolean =
+        user != null && user.active && (user.isAdmin || territory.currentResponsibleId == user.id)
+
+    fun canDeleteNote(user: User?, note: TerritoryNote): Boolean =
+        user != null && user.active && (user.isAdmin || note.authorId == user.id)
 
     fun canCreate(user: User?): Boolean = user != null && user.active && user.isAdmin
 

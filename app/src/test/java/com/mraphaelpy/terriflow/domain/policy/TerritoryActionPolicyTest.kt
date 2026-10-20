@@ -71,4 +71,22 @@ class TerritoryActionPolicyTest {
         assertFalse(TerritoryActionPolicy.canPerform(publisher, t, TerritoryAction.REMIND))
         assertFalse(TerritoryActionPolicy.canPerform(admin, territory(TerritoryStatus.COMPLETED, responsible = publisher), TerritoryAction.REMIND))
     }
+
+    @Test
+    fun `anotacoes so para admin e dirigente atual`() {
+        val t = territory(TerritoryStatus.IN_PROGRESS, responsible = publisher)
+        assertTrue(TerritoryActionPolicy.canAccessNotes(admin, t))
+        assertTrue(TerritoryActionPolicy.canAccessNotes(publisher, t))
+        assertFalse(TerritoryActionPolicy.canAccessNotes(otherPublisher, t))
+
+        val note = com.mraphaelpy.terriflow.domain.model.TerritoryNote(
+            territoryId = t.id,
+            kind = com.mraphaelpy.terriflow.domain.model.TerritoryNoteKind.DO_NOT_CALL,
+            authorId = publisher.id,
+            authorName = publisher.name
+        )
+        assertTrue(TerritoryActionPolicy.canDeleteNote(publisher, note))
+        assertTrue(TerritoryActionPolicy.canDeleteNote(admin, note))
+        assertFalse(TerritoryActionPolicy.canDeleteNote(otherPublisher, note))
+    }
 }

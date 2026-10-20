@@ -125,6 +125,21 @@ service cloud.firestore {
           allow delete: if isAdmin(congId);
           allow update: if false;
         }
+
+        // ── Anotações (inclui "não visitar"): só admins e o dirigente atual ──
+        match /notes/{noteId} {
+          function isCurrentResponsible() {
+            return isActiveUser(congId) &&
+              get(/databases/$(database)/documents/congregations/$(congId)/territories/$(territoryId))
+                .data.currentResponsibleId == request.auth.uid;
+          }
+
+          allow read: if isAdmin(congId) || isCurrentResponsible();
+          allow create: if (isAdmin(congId) || isCurrentResponsible()) &&
+            request.resource.data.authorId == request.auth.uid;
+          allow delete: if isAdmin(congId) || (isActiveUser(congId) && resource.data.authorId == request.auth.uid);
+          allow update: if false;
+        }
       }
 
       // ── Notificações ────────────────────────────────────────────────
