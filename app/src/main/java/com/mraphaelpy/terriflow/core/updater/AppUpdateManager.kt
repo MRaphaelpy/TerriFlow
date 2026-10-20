@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
+import androidx.core.content.edit
 import com.mraphaelpy.terriflow.BuildConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -26,19 +27,16 @@ class AppUpdateManager @Inject constructor(
         private const val GITHUB_OWNER = "MRaphaelpy"
         private const val GITHUB_REPO = "TerriFlow"
         private const val RELEASES_API_URL = "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"
+        private const val KEY_DISMISSED_VERSION = "dismissed_version"
     }
 
     private val prefs = context.getSharedPreferences("terriflow_updater", Context.MODE_PRIVATE)
 
-    fun isVersionDismissed(version: String): Boolean {
-        val cleanVersion = version.removePrefix("v").trim()
-        val dismissed = prefs.getString("dismissed_version", null)
-        return dismissed != null && dismissed == cleanVersion
-    }
+    fun isVersionDismissed(version: String): Boolean =
+        prefs.getString(KEY_DISMISSED_VERSION, null) == VersionComparator.clean(version)
 
     fun dismissVersion(version: String) {
-        val cleanVersion = version.removePrefix("v").trim()
-        prefs.edit().putString("dismissed_version", cleanVersion).apply()
+        prefs.edit { putString(KEY_DISMISSED_VERSION, VersionComparator.clean(version)) }
     }
 
     suspend fun checkForUpdate(): AppUpdateInfo? = withContext(Dispatchers.IO) {
@@ -89,12 +87,12 @@ class AppUpdateManager @Inject constructor(
                 pInfo.versionName?.takeIf { it.isNotBlank() } ?: BuildConfig.VERSION_NAME
             }.getOrDefault(BuildConfig.VERSION_NAME)
 
-            val isNewer = isNewerVersion(tagName, currentVersion)
+            val isNewer = VersionComparator.isNewer(tagName, currentVersion)
 
             AppUpdateInfo(
                 hasUpdate = isNewer,
                 currentVersion = currentVersion,
-                latestVersion = tagName.removePrefix("v"),
+                latestVersion = VersionComparator.clean(tagName),
                 releaseTitle = title,
                 changelog = changelog,
                 downloadUrl = downloadUrl,
@@ -187,25 +185,5 @@ class AppUpdateManager @Inject constructor(
         }
 
         context.startActivity(intent)
-    }
-
-    fun isNewerVersion(remoteTag: String, currentVer: String): Boolean {
-        val cleanRemote = remoteTag.removePrefix("v").trim()
-        val cleanCurrent = currentVer.removePrefix("v").trim()
-        if (cleanRemote.equals(cleanCurrent, ignoreCase = true)) return false
-
-        val remoteParts = cleanRemote.split(".", "-", "_").mapNotNull { it.toIntOrNull() }
-        val currentParts = cleanCurrent.split(".", "-", "_").mapNotNull { it.toIntOrNull() }
-
-        if (remoteParts.isNotEmpty() && remoteParts == currentParts) return false
-
-        val maxLen = maxOf(remoteParts.size, currentParts.size)
-        for (i in 0 until maxLen) {
-            val r = remoteParts.getOrElse(i) { 0 }
-            val c = currentParts.getOrElse(i) { 0 }
-            if (r > c) return true
-            if (r < c) return false
-        }
-        return false
     }
 }
