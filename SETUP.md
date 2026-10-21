@@ -47,13 +47,14 @@ congregations/{congId}/users/{uid}
 congregations/{congId}/territories/{territoryId}
   code (T-00042 ou personalizado), name, description, location, notes,
   status (AVAILABLE | ASSIGNED | IN_PROGRESS | PAUSED | COMPLETED | RETURNED | ARCHIVED),
-  currentResponsibleId/Name/PhotoUrl, pastResponsibleIds,
+  currentResponsibleId/Name, pastResponsibleIds,
   createdAt, assignedAt, startedAt, completedAt, returnedAt, updatedAt,
   latitude, longitude, boundaryPoints, blockPolygons,
-  completedBlocks (índices das quadras feitas no ciclo atual), syncVersion
+  completedBlocks (índices das quadras feitas no ciclo atual), syncVersion,
+  serverUpdatedAt (horário do servidor, usado na sincronização incremental)
 
 congregations/{congId}/territories/{territoryId}/events/{eventId}   imutáveis
-  territoryId, userId, userName, type, timestamp, extra, congregationId
+  territoryId, userId, userName, type, timestamp, extra, congregationId, serverCreatedAt
 
 congregations/{congId}/territories/{territoryId}/notes/{noteId}   só admins e dirigente atual
   kind (DO_NOT_CALL | FIELD_NOTE), address, text, authorId, authorName, createdAt
@@ -98,19 +99,23 @@ Regras práticas para novas funcionalidades:
 - **Offline-first**: toda escrita vai primeiro para o Room; a UI observa o Room.
 - **Envio**: o `RemoteWriter` emite a gravação no Firestore em segundo plano (o próprio
   Firestore a enfileira enquanto estiver offline). Registros sem confirmação ficam com
-  `synced = false` e o `SyncWorker` (a cada 15 min, com internet) os reenvia.
+  `synced = false` e o `SyncWorker` (a cada 1 hora, com internet) os reenvia.
 - **Recebimento**: o `RealtimeSyncManager` mantém listeners de territórios, notificações
   e eventos recentes enquanto houver usuário logado, reiniciando a cada login/logout.
 - **Conflitos**: alterações locais pendentes nunca são sobrescritas; fora isso, a versão
   remota vence quando `syncVersion` for igual ou maior (`TerritoryRemoteMerger`).
 - **Eventos**: imutáveis no servidor; antes de reenviar um pendente verifica-se se já existe.
+- **Incremental**: cada gravação leva um horário do servidor (`serverUpdatedAt` /
+  `serverCreatedAt`) e as sincronizações buscam só o que mudou desde a última vez
+  (`SyncStateStore`). Uma cópia completa é feita uma vez por dia (territórios e usuários)
+  ou por semana (eventos e notificações) para detectar exclusões.
 
 ## 8. Relatórios e acompanhamento
 
 - **Ano de serviço**: de 1º de setembro a 31 de agosto (`ServiceYear`).
 - **Designações** são reconstruídas a partir dos eventos (`AssignmentHistory`) e alimentam
   a meta de cobertura, o alerta de 12 meses, os tempos médios e o **S-13** (PDF/CSV).
-- **Auditoria** e **Cobertura** baixam o histórico de todos os territórios ao abrir.
+- **Auditoria** e **Cobertura** leem o histórico do banco local, mantido pela sincronização incremental.
 - **Lembretes** ao dirigente: 7 e 30 dias sem iniciar; 2 e 4 meses com o território.
   Admins podem "Cobrar devolução" a qualquer momento.
 - **Limite sugerido** de territórios ativos por dirigente: `TerritoryRotationHelper.MAX_ACTIVE_PER_RESPONSIBLE`.
@@ -120,6 +125,10 @@ Regras práticas para novas funcionalidades:
 ```
 ./gradlew testDebugUnitTest
 ```
+
+O `AppDatabaseMigrationTest` (Robolectric) recria o banco em cada versão antiga e aplica
+as migrações. Ao mudar uma entidade do Room, suba a versão, crie a migração, adicione-a em
+`AppDatabase.ALL_MIGRATIONS` e registre as colunas novas em `COLUMNS_ADDED` no teste.
 
 ## 10. Permissão de notificações (Android 13+)
 
