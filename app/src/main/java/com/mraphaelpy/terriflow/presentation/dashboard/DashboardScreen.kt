@@ -1,5 +1,7 @@
 package com.mraphaelpy.terriflow.presentation.dashboard
 
+import com.mraphaelpy.terriflow.presentation.navigation.LocalBottomBarClearance
+import com.mraphaelpy.terriflow.presentation.navigation.tabScreenInsets
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -94,7 +96,6 @@ import com.mraphaelpy.terriflow.presentation.components.segmentedShape
 import com.mraphaelpy.terriflow.presentation.components.statusColor
 import com.mraphaelpy.terriflow.presentation.territorydetail.statusSince
 
-private val BottomNavClearance = 112.dp
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -197,7 +198,8 @@ fun DashboardScreen(
                 scrollBehavior = scrollBehavior
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState, Modifier.padding(bottom = BottomNavClearance)) }
+        snackbarHost = { SnackbarHost(snackbarHostState, Modifier.padding(bottom = LocalBottomBarClearance.current)) },
+        contentWindowInsets = tabScreenInsets
     ) { padding ->
         PullToRefreshBox(
             isRefreshing = uiState.isRefreshing,
@@ -208,7 +210,7 @@ fun DashboardScreen(
         ) {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = BottomNavClearance),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = LocalBottomBarClearance.current),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 item(key = "summary") {

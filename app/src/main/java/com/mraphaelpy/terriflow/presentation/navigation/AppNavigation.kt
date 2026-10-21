@@ -1,6 +1,11 @@
 package com.mraphaelpy.terriflow.presentation.navigation
 
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.Alignment
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
@@ -76,13 +81,29 @@ fun AppNavigation(
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
-    
-    val showBottomBar = currentRoute in listOf(
-        Screen.Dashboard.route,
-        Screen.TerritoryList.route,
-        Screen.Map.route
-    )
+    val mapHighlight = navBackStackEntry?.arguments?.getString("highlightId").orEmpty()
+    val selectedTab = when {
+        currentRoute == Screen.Dashboard.route -> BottomTab.HOME
+        currentRoute == Screen.TerritoryList.route -> BottomTab.TERRITORIES
+        currentRoute == Screen.Map.route && mapHighlight.isEmpty() -> BottomTab.MAP
+        else -> null
+    }
+    val clearance = if (selectedTab != null) bottomBarClearance() else 0.dp
 
+    fun openTab(tab: BottomTab) {
+        val route = when (tab) {
+            BottomTab.HOME -> Screen.Dashboard.route
+            BottomTab.TERRITORIES -> Screen.TerritoryList.route
+            BottomTab.MAP -> Screen.Map.createRoute()
+        }
+        navController.navigate(route) {
+            popUpTo(Screen.Dashboard.route) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
+    CompositionLocalProvider(LocalBottomBarClearance provides clearance) {
     Box(modifier = Modifier.fillMaxSize()) {
         NavHost(
             navController = navController,
@@ -168,8 +189,8 @@ fun AppNavigation(
 
         composable(Screen.Dashboard.route) {
             DashboardScreen(
-                onNavigateToTerritories = { navController.navigate(Screen.TerritoryList.route) },
-                onNavigateToMap = { navController.navigate(Screen.Map.createRoute()) },
+                onNavigateToTerritories = { openTab(BottomTab.TERRITORIES) },
+                onNavigateToMap = { openTab(BottomTab.MAP) },
                 onNavigateToNotifications = { navController.navigate(Screen.Notifications.route) },
                 onNavigateToTerritory = { id ->
                     navController.navigate(Screen.TerritoryDetail.createRoute(id))
@@ -192,8 +213,7 @@ fun AppNavigation(
                     navController.navigate(Screen.TerritoryDetail.createRoute(id))
                 },
                 onCreateTerritory = { navController.navigate(Screen.CreateTerritory.route) },
-                onImportKml = { navController.navigate(Screen.ImportKml.route) },
-                onNavigateBack = { navController.popBackStack() }
+                onImportKml = { navController.navigate(Screen.ImportKml.route) }
             )
         }
 
@@ -302,75 +322,14 @@ fun AppNavigation(
         }
     }
         
-        if (showBottomBar) {
-            TerriflowBottomNavBar(
-                currentRoute = currentRoute,
-                onNavigateToDashboard = {
-                    navController.navigate(Screen.Dashboard.route) {
-                        popUpTo(Screen.Dashboard.route) { inclusive = true }
-                    }
-                },
-                onNavigateToTerritories = {
-                    navController.navigate(Screen.TerritoryList.route) {
-                        popUpTo(Screen.Dashboard.route)
-                    }
-                },
-                onNavigateToMap = {
-                    navController.navigate(Screen.Map.createRoute()) {
-                        popUpTo(Screen.Dashboard.route)
-                    }
-                },
-                modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter)
-            )
+        AnimatedVisibility(
+            visible = selectedTab != null,
+            enter = slideInVertically { it } + fadeIn(),
+            exit = slideOutVertically { it } + fadeOut(),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            TerriflowBottomNavBar(selected = selectedTab, onSelect = ::openTab)
         }
     }
-}
-
-@Composable
-fun TerriflowBottomNavBar(
-    currentRoute: String?,
-    onNavigateToDashboard: () -> Unit,
-    onNavigateToTerritories: () -> Unit,
-    onNavigateToMap: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    androidx.compose.foundation.layout.Box(
-        modifier = modifier
-            .padding(horizontal = 16.dp, vertical = 16.dp)
-            .fillMaxWidth(),
-        contentAlignment = androidx.compose.ui.Alignment.BottomCenter
-    ) {
-        Surface(
-            shape = androidx.compose.foundation.shape.RoundedCornerShape(32.dp),
-            color = MaterialTheme.colorScheme.surfaceColorAtElevation(3.dp).copy(alpha = 0.90f),
-            shadowElevation = 8.dp,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            NavigationBar(
-                modifier = Modifier.fillMaxWidth(),
-                containerColor = androidx.compose.ui.graphics.Color.Transparent,
-                tonalElevation = 0.dp,
-                windowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0)
-            ) {
-                NavigationBarItem(
-                    selected = currentRoute == Screen.Dashboard.route,
-                    onClick = onNavigateToDashboard,
-                    icon = { Icon(Icons.Default.Home, contentDescription = "Início") },
-                    label = { Text("Início") }
-                )
-                NavigationBarItem(
-                    selected = currentRoute == Screen.TerritoryList.route,
-                    onClick = onNavigateToTerritories,
-                    icon = { Icon(Icons.Default.GridView, contentDescription = "Territórios") },
-                    label = { Text("Territórios") }
-                )
-                NavigationBarItem(
-                    selected = currentRoute?.startsWith("map") == true,
-                    onClick = onNavigateToMap,
-                    icon = { Icon(Icons.Default.Map, contentDescription = "Mapa") },
-                    label = { Text("Mapa") }
-                )
-            }
-        }
     }
 }

@@ -1,5 +1,7 @@
 package com.mraphaelpy.terriflow.presentation.territories
 
+import com.mraphaelpy.terriflow.presentation.navigation.LocalBottomBarClearance
+import com.mraphaelpy.terriflow.presentation.navigation.tabScreenInsets
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
@@ -70,8 +72,7 @@ import com.mraphaelpy.terriflow.presentation.components.TerritoryShapeBadge
 import com.mraphaelpy.terriflow.presentation.components.UserAvatarByName
 import com.mraphaelpy.terriflow.presentation.components.statusColor
 
-private val BottomNavClearance = 112.dp
-private val FabBottomOffset = 32.dp
+private val FabSpacing = 8.dp
 private val OuterCorner = 24.dp
 private val InnerCorner = 6.dp
 private val PressedCorner = 32.dp
@@ -83,7 +84,6 @@ fun TerritoryListScreen(
     onNavigateToTerritory: (String) -> Unit,
     onCreateTerritory: () -> Unit,
     onImportKml: () -> Unit,
-    onNavigateBack: () -> Unit,
     viewModel: TerritoryListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -94,6 +94,7 @@ fun TerritoryListScreen(
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        contentWindowInsets = tabScreenInsets,
         topBar = {
             LargeFlexibleTopAppBar(
                 title = { Text("Territórios") },
@@ -105,7 +106,7 @@ fun TerritoryListScreen(
             if (uiState.isAdmin) {
                 FloatingActionButtonMenu(
                     expanded = fabMenuExpanded,
-                    modifier = Modifier.padding(bottom = FabBottomOffset),
+                    modifier = Modifier.padding(bottom = (LocalBottomBarClearance.current - FabSpacing).coerceAtLeast(0.dp)),
                     button = {
                         ToggleFloatingActionButton(
                             checked = fabMenuExpanded,
@@ -194,7 +195,7 @@ private fun TerritorySections(
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = BottomNavClearance + 72.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = LocalBottomBarClearance.current + 72.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         uiState.sections.forEach { section ->
@@ -392,7 +393,7 @@ private fun EmptyTerritories(hasFilters: Boolean, onClearFilters: () -> Unit) {
         modifier = Modifier
             .fillMaxSize()
             .padding(32.dp)
-            .padding(bottom = BottomNavClearance),
+            .padding(bottom = LocalBottomBarClearance.current),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {

@@ -1,5 +1,6 @@
 package com.mraphaelpy.terriflow.presentation.map
 
+import com.mraphaelpy.terriflow.presentation.navigation.floatingControlsBottomPadding
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -71,7 +72,6 @@ import com.mraphaelpy.terriflow.presentation.components.TerritoryFilterChips
 import com.mraphaelpy.terriflow.presentation.components.statusColor
 import kotlinx.coroutines.launch
 
-private val BottomNavClearance = 112.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -199,7 +199,7 @@ fun MapScreen(
         Column(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = BottomNavClearance),
+                .padding(end = 16.dp, bottom = floatingControlsBottomPadding()),
             horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -230,7 +230,7 @@ fun MapScreen(
             hostState = snackbarHostState,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = BottomNavClearance)
+                .padding(bottom = floatingControlsBottomPadding())
         )
     }
 }
