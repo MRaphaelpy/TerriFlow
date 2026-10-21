@@ -116,6 +116,7 @@ fun MapScreen(
         AllTerritoriesMap(
             state = mapState,
             territories = uiState.visibleTerritories,
+            allTerritories = uiState.mappedTerritories,
             colors = palette,
             highlightId = selectedId,
             currentUserId = uiState.currentUserId,

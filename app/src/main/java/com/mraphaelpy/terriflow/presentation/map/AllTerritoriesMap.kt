@@ -69,25 +69,61 @@ class TerritoryMapState {
         return false
     }
 
-    private fun fitTo(bounds: GeoBounds, padding: Float = 1.25f) {
+    private fun fitTo(bounds: GeoBounds, padding: Float = 1.25f, animate: Boolean = true) {
         val map = mapView ?: return
-        val isSinglePoint = bounds.north == bounds.south && bounds.east == bounds.west
+        val action = { moveCamera(map, bounds, padding, animate) }
+        if (map.width == 0 || map.height == 0) map.addOnFirstLayoutListener { _, _, _, _, _ -> action() } else action()
+    }
+
+    internal fun showInstantly(territories: List<Territory>, highlighted: Territory?) {
+        val target = (highlighted?.let { listOf(it) } ?: territories).bounds() ?: return
+        fitTo(target, padding = if (highlighted != null) 1.6f else 1.25f, animate = false)
+    }
+
+    internal fun limitTo(area: GeoBounds) {
+        val map = mapView ?: return
         val action = {
-            if (isSinglePoint) {
-                map.controller.animateTo(GeoPoint(bounds.north, bounds.east), SINGLE_POINT_ZOOM, ANIMATION_MS)
-            } else {
-                val box = BoundingBox(bounds.north, bounds.east, bounds.south, bounds.west).increaseByScale(padding)
-                map.zoomToBoundingBox(box, true)
-            }
+            val limit = area.toBox().increaseByScale(AREA_LIMIT_SCALE)
+            map.setScrollableAreaLimitDouble(limit)
+            val fitZoom = MapView.getTileSystem().getBoundingBoxZoom(limit, map.width, map.height)
+            map.minZoomLevel = (fitZoom - 0.5).coerceIn(MIN_ZOOM, MAX_MIN_ZOOM)
         }
         if (map.width == 0 || map.height == 0) map.addOnFirstLayoutListener { _, _, _, _, _ -> action() } else action()
+    }
+
+    private fun moveCamera(map: MapView, bounds: GeoBounds, padding: Float, animate: Boolean) {
+        val isSinglePoint = bounds.north == bounds.south && bounds.east == bounds.west
+        if (isSinglePoint) {
+            val point = GeoPoint(bounds.north, bounds.east)
+            if (animate) {
+                map.controller.animateTo(point, SINGLE_POINT_ZOOM, ANIMATION_MS)
+            } else {
+                map.controller.setZoom(SINGLE_POINT_ZOOM)
+                map.controller.setCenter(point)
+            }
+        } else {
+            val box = bounds.toBox().increaseByScale(padding)
+            if (animate) map.zoomToBoundingBox(box, true) else jumpTo(map, box)
+        }
     }
 
     private companion object {
         const val MY_LOCATION_ZOOM = 18.0
         const val SINGLE_POINT_ZOOM = 17.0
         const val ANIMATION_MS = 600L
+        const val AREA_LIMIT_SCALE = 3f
+        const val MIN_ZOOM = 4.0
+        const val MAX_MIN_ZOOM = 14.0
     }
+}
+
+private fun GeoBounds.toBox() = BoundingBox(north, east, south, west)
+
+private fun jumpTo(map: MapView, box: BoundingBox) {
+    val zoom = MapView.getTileSystem().getBoundingBoxZoom(box, map.width, map.height)
+        .coerceIn(map.minZoomLevel, map.maxZoomLevel)
+    map.controller.setZoom(zoom)
+    map.controller.setCenter(box.centerWithDateLine)
 }
 
 private data class RenderKey(val territory: Territory, val color: Color, val highlighted: Boolean, val mine: Boolean)
@@ -105,6 +141,7 @@ fun AllTerritoriesMap(
     territories: List<Territory>,
     colors: Map<String, Color>,
     onTerritoryClick: (String) -> Unit,
+    allTerritories: List<Territory> = territories,
     modifier: Modifier = Modifier,
     highlightId: String? = null,
     currentUserId: String? = null,
@@ -148,11 +185,19 @@ fun AllTerritoriesMap(
         }
     }
 
+    val areaStore = remember { MapAreaStore(context) }
+    val area = remember(allTerritories) { allTerritories.bounds() }
+
+    LaunchedEffect(area) {
+        area ?: return@LaunchedEffect
+        areaStore.save(area)
+        state.limitTo(area)
+    }
+
     LaunchedEffect(territories.isNotEmpty(), highlightId) {
         if (state.initialFitDone || territories.isEmpty()) return@LaunchedEffect
         state.initialFitDone = true
-        val highlighted = territories.firstOrNull { it.id == highlightId }
-        if (highlighted != null) state.focus(highlighted) else state.fitTo(territories)
+        state.showInstantly(territories, territories.firstOrNull { it.id == highlightId })
     }
 
     AndroidView(
@@ -165,8 +210,17 @@ fun AllTerritoriesMap(
                 isTilesScaledToDpi = true
                 zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
                 minZoomLevel = 4.0
-                controller.setZoom(12.0)
-                controller.setCenter(GeoPoint(-23.5505, -46.6333))
+                val savedArea = areaStore.load()
+                if (savedArea != null) {
+                    addOnFirstLayoutListener { _, _, _, _, _ ->
+                        if (!state.initialFitDone) jumpTo(this, savedArea.toBox().increaseByScale(1.25f))
+                    }
+                    controller.setZoom(13.0)
+                    controller.setCenter(GeoPoint((savedArea.north + savedArea.south) / 2, (savedArea.east + savedArea.west) / 2))
+                } else {
+                    controller.setZoom(12.0)
+                    controller.setCenter(GeoPoint(-23.5505, -46.6333))
+                }
 
                 val overlay = GoogleMapsStyleLocationOverlay(ctx, this)
                 overlays.add(overlay)
