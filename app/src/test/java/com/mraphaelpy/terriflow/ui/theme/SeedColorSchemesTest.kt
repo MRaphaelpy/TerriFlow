@@ -2,7 +2,9 @@ package com.mraphaelpy.terriflow.ui.theme
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import com.mraphaelpy.terriflow.domain.model.TerritoryStatus
 import com.mraphaelpy.terriflow.domain.repository.AppColor
+import com.mraphaelpy.terriflow.domain.repository.ContrastLevel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -41,6 +43,26 @@ class SeedColorSchemesTest {
         for (option in seeds) {
             assertTrue(SeedColorSchemes.of(option.seed, true).surface.luminance() < 0.1f)
             assertTrue(SeedColorSchemes.of(option.seed, false).surface.luminance() > 0.8f)
+        }
+    }
+
+    @Test
+    fun `contraste alto aumenta o contraste do texto`() {
+        for (option in seeds) for (dark in listOf(false, true)) {
+            val standard = SeedColorSchemes.of(option.seed, dark, ContrastLevel.STANDARD.value)
+            val high = SeedColorSchemes.of(option.seed, dark, ContrastLevel.HIGH.value)
+            assertTrue(contrast(high.surface, high.onSurfaceVariant) > contrast(standard.surface, standard.onSurfaceVariant))
+            assertTrue(contrast(high.primary, high.onPrimary) >= 7f)
+        }
+    }
+
+    @Test
+    fun `cores de status continuam diferentes entre si em qualquer tema`() {
+        for (option in seeds) for (dark in listOf(false, true)) {
+            val primary = SeedColorSchemes.of(option.seed, dark).primary
+            val colors = StatusColors.harmonizedWith(primary, dark)
+            val distinct = TerritoryStatus.entries.map { colors[it] }.toSet()
+            assertEquals(TerritoryStatus.entries.size, distinct.size)
         }
     }
 

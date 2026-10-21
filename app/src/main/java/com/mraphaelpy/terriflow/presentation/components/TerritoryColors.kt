@@ -1,19 +1,16 @@
 package com.mraphaelpy.terriflow.presentation.components
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
+import com.mraphaelpy.terriflow.ui.theme.LocalStatusColors
 import com.mraphaelpy.terriflow.domain.model.Territory
 import com.mraphaelpy.terriflow.domain.model.TerritoryCode
 import com.mraphaelpy.terriflow.domain.model.TerritoryStatus
 
-fun statusColor(status: TerritoryStatus): Color = when (status) {
-    TerritoryStatus.AVAILABLE   -> Color(0xFF4CAF50)
-    TerritoryStatus.ASSIGNED    -> Color(0xFF2196F3)
-    TerritoryStatus.IN_PROGRESS -> Color(0xFFFF9800)
-    TerritoryStatus.PAUSED      -> Color(0xFF9E9E9E)
-    TerritoryStatus.COMPLETED   -> Color(0xFF8BC34A)
-    TerritoryStatus.RETURNED    -> Color(0xFFF44336)
-    TerritoryStatus.ARCHIVED    -> Color(0xFF607D8B)
-}
+@Composable
+@ReadOnlyComposable
+fun statusColor(status: TerritoryStatus): Color = LocalStatusColors.current[status]
 
 fun territoryPalette(territories: List<Territory>): Map<String, Color> =
     territories

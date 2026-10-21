@@ -1,5 +1,9 @@
 package com.mraphaelpy.terriflow.presentation.map
 
+import java.util.WeakHashMap
+import org.osmdroid.views.MapView
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.ColorMatrix
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
@@ -165,4 +169,42 @@ fun openInGoogleMaps(context: Context, lat: Double?, lng: Double?, label: String
         val webUri = "https://maps.google.com/?q=$lat,$lng".toUri()
         context.startActivity(Intent(Intent.ACTION_VIEW, webUri))
     }
+}
+
+private val DarkTilesFilter: ColorMatrixColorFilter by lazy {
+    val invert = ColorMatrix(
+        floatArrayOf(
+            -1f, 0f, 0f, 0f, 255f,
+            0f, -1f, 0f, 0f, 255f,
+            0f, 0f, -1f, 0f, 255f,
+            0f, 0f, 0f, 1f, 0f
+        )
+    )
+    val hueRotate = ColorMatrix(
+        floatArrayOf(
+            -0.574f, 1.43f, 0.144f, 0f, 0f,
+            0.426f, 0.43f, 0.144f, 0f, 0f,
+            0.426f, 1.43f, -0.856f, 0f, 0f,
+            0f, 0f, 0f, 1f, 0f
+        )
+    )
+    val dim = ColorMatrix().apply { setScale(0.85f, 0.85f, 0.9f, 1f) }
+    val desaturate = ColorMatrix().apply { setSaturation(0.75f) }
+    ColorMatrixColorFilter(
+        ColorMatrix().apply {
+            postConcat(invert)
+            postConcat(hueRotate)
+            postConcat(desaturate)
+            postConcat(dim)
+        }
+    )
+}
+
+private val darkTilesState = WeakHashMap<MapView, Boolean>()
+
+fun MapView.applyDarkTiles(dark: Boolean) {
+    if (darkTilesState[this] == dark) return
+    darkTilesState[this] = dark
+    overlayManager.tilesOverlay.setColorFilter(if (dark) DarkTilesFilter else null)
+    invalidate()
 }

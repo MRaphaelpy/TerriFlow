@@ -1,5 +1,7 @@
 package com.mraphaelpy.terriflow.presentation.territorydetail
 
+import com.mraphaelpy.terriflow.presentation.map.applyDarkTiles
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -93,11 +95,13 @@ internal fun TerritoryMiniMap(
                     .fillMaxWidth()
                     .height(260.dp)
             ) {
+                val darkTiles = MaterialTheme.colorScheme.surface.luminance() < 0.5f
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),
                     factory = { ctx ->
                         Configuration.getInstance().userAgentValue = ctx.packageName
                         MapView(ctx).apply {
+                            applyDarkTiles(darkTiles)
                             detailMapView = this
                             setTileSource(TileSourceFactory.MAPNIK)
                             setMultiTouchControls(false)
@@ -112,6 +116,7 @@ internal fun TerritoryMiniMap(
                         }
                     },
                     update = { mapView ->
+                        mapView.applyDarkTiles(darkTiles)
                         val currentKey = "$lat,$lng,$markerColor,$showBlocks,${boundaryPoints.size},${blockPolygons.size},${completedBlocks.sorted()}"
                         if (currentKey != lastDrawnKey) {
                             lastDrawnKey = currentKey

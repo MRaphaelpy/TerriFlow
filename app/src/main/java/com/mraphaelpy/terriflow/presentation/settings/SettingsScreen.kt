@@ -1,5 +1,10 @@
 package com.mraphaelpy.terriflow.presentation.settings
 
+import androidx.compose.material3.Slider
+import androidx.compose.ui.semantics.stateDescription
+import com.mraphaelpy.terriflow.domain.repository.ContrastLevel
+import com.mraphaelpy.terriflow.domain.repository.TextSize
+import kotlin.math.roundToInt
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateIntAsState
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -154,6 +159,20 @@ fun SettingsScreen(
                 Spacer(Modifier.size(4.dp))
                 Text("Cor de destaque", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
                 ColorSelector(selected = uiState.appColor, onSelect = viewModel::updateAppColor)
+            }
+
+            SectionTitle("Acessibilidade")
+            SettingsCard {
+                Text("Tamanho do texto", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                TextSizeSelector(selected = uiState.textSize, onSelect = viewModel::updateTextSize)
+                Spacer(Modifier.size(4.dp))
+                Text("Contraste", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                ContrastSelector(selected = uiState.contrastLevel, onSelect = viewModel::updateContrastLevel)
+                Text(
+                    "Contraste maior deixa textos e botões mais fáceis de ler, principalmente no sol.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
 
             SectionTitle("Aplicativo")
@@ -323,6 +342,75 @@ private fun ThemeSelector(selected: ThemeMode, onSelect: (ThemeMode) -> Unit) {
                 Icon(option.icon, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(6.dp))
                 Text(option.label, maxLines = 1)
+            }
+        }
+    }
+}
+
+private val TextSize.label: String
+    get() = when (this) {
+        TextSize.SMALL -> "Pequeno"
+        TextSize.DEFAULT -> "Padrão"
+        TextSize.LARGE -> "Grande"
+        TextSize.EXTRA_LARGE -> "Muito grande"
+        TextSize.HUGE -> "Máximo"
+    }
+
+@Composable
+private fun TextSizeSelector(selected: TextSize, onSelect: (TextSize) -> Unit) {
+    val sizes = TextSize.entries
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Surface(shape = MaterialTheme.shapes.large, color = MaterialTheme.colorScheme.surfaceContainerHighest, modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Território 12 · Centro", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Text("Rua das Flores, quadras 1 a 8", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("A", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+            Slider(
+                value = sizes.indexOf(selected).toFloat(),
+                onValueChange = { onSelect(sizes[it.roundToInt().coerceIn(0, sizes.lastIndex)]) },
+                valueRange = 0f..sizes.lastIndex.toFloat(),
+                steps = sizes.size - 2,
+                modifier = Modifier.weight(1f).semantics { stateDescription = selected.label }
+            )
+            Text("A", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+        }
+        Text(
+            selected.label,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.fillMaxWidth(),
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+private val ContrastLevel.label: String
+    get() = when (this) {
+        ContrastLevel.STANDARD -> "Padrão"
+        ContrastLevel.MEDIUM -> "Médio"
+        ContrastLevel.HIGH -> "Alto"
+    }
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ContrastSelector(selected: ContrastLevel, onSelect: (ContrastLevel) -> Unit) {
+    val levels = ContrastLevel.entries
+    Row(horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween), modifier = Modifier.fillMaxWidth()) {
+        levels.forEachIndexed { index, level ->
+            ToggleButton(
+                checked = selected == level,
+                onCheckedChange = { onSelect(level) },
+                shapes = when (index) {
+                    0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                    levels.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                    else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                },
+                modifier = Modifier.weight(1f).semantics { role = Role.RadioButton }
+            ) {
+                Text(level.label, maxLines = 1)
             }
         }
     }

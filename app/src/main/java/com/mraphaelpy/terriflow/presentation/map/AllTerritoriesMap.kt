@@ -23,7 +23,9 @@ import com.mraphaelpy.terriflow.domain.model.bounds
 import com.mraphaelpy.terriflow.domain.model.center
 import com.mraphaelpy.terriflow.domain.model.displayName
 import com.mraphaelpy.terriflow.domain.model.label
-import com.mraphaelpy.terriflow.presentation.components.statusColor
+import com.mraphaelpy.terriflow.ui.theme.LocalStatusColors
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.luminance
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.BoundingBox
@@ -126,7 +128,13 @@ private fun jumpTo(map: MapView, box: BoundingBox) {
     map.controller.setCenter(box.centerWithDateLine)
 }
 
-private data class RenderKey(val territory: Territory, val color: Color, val highlighted: Boolean, val mine: Boolean)
+private data class RenderKey(
+    val territory: Territory,
+    val color: Color,
+    val statusColor: Color,
+    val highlighted: Boolean,
+    val mine: Boolean
+)
 
 private class RenderedTerritory(
     val key: RenderKey,
@@ -185,6 +193,8 @@ fun AllTerritoriesMap(
         }
     }
 
+    val statusColors = LocalStatusColors.current
+    val darkTiles = MaterialTheme.colorScheme.surface.luminance() < 0.5f
     val areaStore = remember { MapAreaStore(context) }
     val area = remember(allTerritories) { allTerritories.bounds() }
 
@@ -229,10 +239,12 @@ fun AllTerritoriesMap(
             }
         },
         update = { mapView ->
+            mapView.applyDarkTiles(darkTiles)
             val desired = territories.associate { territory ->
                 territory.id to RenderKey(
                     territory = territory,
-                    color = colors[territory.id] ?: statusColor(territory.status),
+                    color = colors[territory.id] ?: statusColors[territory.status],
+                    statusColor = statusColors[territory.status],
                     highlighted = territory.id == highlightId,
                     mine = currentUserId != null && territory.currentResponsibleId == currentUserId
                 )
@@ -316,7 +328,7 @@ private fun buildMarker(
         createTerritoryMarkerIcon(
             context = mapView.context,
             color = key.color.toArgb(),
-            statusColor = statusColor(territory.status).toArgb(),
+            statusColor = key.statusColor.toArgb(),
             label = label,
             ownerLabel = owner,
             highlighted = key.highlighted

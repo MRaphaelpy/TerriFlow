@@ -9,6 +9,8 @@ import com.mraphaelpy.terriflow.core.updater.AppUpdateManager
 import com.mraphaelpy.terriflow.domain.model.Congregation
 import com.mraphaelpy.terriflow.domain.model.User
 import com.mraphaelpy.terriflow.domain.repository.AppColor
+import com.mraphaelpy.terriflow.domain.repository.ContrastLevel
+import com.mraphaelpy.terriflow.domain.repository.TextSize
 import com.mraphaelpy.terriflow.domain.repository.AuthRepository
 import com.mraphaelpy.terriflow.domain.repository.CongregationRepository
 import com.mraphaelpy.terriflow.domain.repository.SettingsRepository
@@ -28,6 +30,8 @@ data class SettingsUiState(
     val currentUser: User? = null,
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val appColor: AppColor = AppColor.DEFAULT,
+    val textSize: TextSize = TextSize.DEFAULT,
+    val contrastLevel: ContrastLevel = ContrastLevel.STANDARD,
     val congregation: Congregation? = null,
     val congregationLoading: Boolean = true,
     val isCheckingUpdate: Boolean = false,
@@ -57,17 +61,26 @@ class SettingsViewModel @Inject constructor(
     private val congregationState = MutableStateFlow(CongregationState())
     private val updateState = MutableStateFlow(UpdateCheckState())
 
-    val uiState = combine(
-        authRepository.observeCurrentUser(),
+    private val appearance = combine(
         repository.themeMode,
         repository.appColor,
+        repository.textSize,
+        repository.contrastLevel,
+        ::Appearance
+    )
+
+    val uiState = combine(
+        authRepository.observeCurrentUser(),
+        appearance,
         congregationState,
         updateState
-    ) { user, mode, color, congregation, update ->
+    ) { user, look, congregation, update ->
         SettingsUiState(
             currentUser = user,
-            themeMode = mode,
-            appColor = color,
+            themeMode = look.themeMode,
+            appColor = look.appColor,
+            textSize = look.textSize,
+            contrastLevel = look.contrastLevel,
             congregation = congregation.congregation,
             congregationLoading = congregation.isLoading,
             isCheckingUpdate = update.isChecking,
@@ -126,6 +139,14 @@ class SettingsViewModel @Inject constructor(
         updateState.update { it.copy(message = null) }
     }
 
+    fun updateTextSize(size: TextSize) {
+        viewModelScope.launch { repository.setTextSize(size) }
+    }
+
+    fun updateContrastLevel(level: ContrastLevel) {
+        viewModelScope.launch { repository.setContrastLevel(level) }
+    }
+
     fun updateThemeMode(mode: ThemeMode) {
         viewModelScope.launch { repository.setThemeMode(mode) }
     }
@@ -134,3 +155,10 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { repository.setAppColor(color) }
     }
 }
+
+private data class Appearance(
+    val themeMode: ThemeMode,
+    val appColor: AppColor,
+    val textSize: TextSize,
+    val contrastLevel: ContrastLevel
+)

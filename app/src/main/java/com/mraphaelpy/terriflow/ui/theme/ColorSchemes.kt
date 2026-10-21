@@ -14,11 +14,15 @@ import java.util.concurrent.ConcurrentHashMap
 
 object SeedColorSchemes {
 
-    private val cache = ConcurrentHashMap<Pair<Int, Boolean>, ColorScheme>()
+    private data class Key(val seed: Int, val dark: Boolean, val contrast: Double)
+
+    private val cache = ConcurrentHashMap<Key, ColorScheme>()
     private val colors = MaterialDynamicColors()
 
-    fun of(seed: Color, dark: Boolean): ColorScheme =
-        cache.getOrPut(seed.toArgb() to dark) { build(SchemeTonalSpot(Hct.fromInt(seed.toArgb()), dark, 0.0)) }
+    fun of(seed: Color, dark: Boolean, contrast: Double = 0.0): ColorScheme =
+        cache.getOrPut(Key(seed.toArgb(), dark, contrast)) {
+            build(SchemeTonalSpot(Hct.fromInt(seed.toArgb()), dark, contrast))
+        }
 
     private fun build(scheme: DynamicScheme): ColorScheme {
         fun DynamicColor.color() = Color(getArgb(scheme))

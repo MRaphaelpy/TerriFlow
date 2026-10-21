@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.mraphaelpy.terriflow.core.updater.AppUpdateInfo
 import com.mraphaelpy.terriflow.core.updater.AppUpdateManager
 import com.mraphaelpy.terriflow.domain.repository.AppColor
+import com.mraphaelpy.terriflow.domain.repository.ContrastLevel
+import com.mraphaelpy.terriflow.domain.repository.TextSize
 import com.mraphaelpy.terriflow.domain.repository.AuthRepository
 import com.mraphaelpy.terriflow.domain.repository.CongregationRepository
 import com.mraphaelpy.terriflow.domain.repository.SettingsRepository
@@ -39,6 +41,10 @@ class MainViewModel @Inject constructor(
         settingsRepository.themeMode.stateIn(viewModelScope, SharingStarted.Eagerly, ThemeMode.SYSTEM)
     val appColor: StateFlow<AppColor> =
         settingsRepository.appColor.stateIn(viewModelScope, SharingStarted.Eagerly, AppColor.DEFAULT)
+    val textSize: StateFlow<TextSize> =
+        settingsRepository.textSize.stateIn(viewModelScope, SharingStarted.Eagerly, TextSize.DEFAULT)
+    val contrastLevel: StateFlow<ContrastLevel> =
+        settingsRepository.contrastLevel.stateIn(viewModelScope, SharingStarted.Eagerly, ContrastLevel.STANDARD)
 
     private val _startDestination = MutableStateFlow<String?>(null)
     val startDestination: StateFlow<String?> = _startDestination.asStateFlow()

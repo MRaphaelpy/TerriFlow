@@ -44,13 +44,15 @@ class MainActivity : ComponentActivity() {
         setContent {
             val themeMode by viewModel.themeMode.collectAsStateWithLifecycle()
             val appColor by viewModel.appColor.collectAsStateWithLifecycle()
+            val textSize by viewModel.textSize.collectAsStateWithLifecycle()
+            val contrastLevel by viewModel.contrastLevel.collectAsStateWithLifecycle()
             val startDestination by viewModel.startDestination.collectAsStateWithLifecycle()
             val availableUpdate by viewModel.availableUpdate.collectAsStateWithLifecycle()
             val userDirectory by viewModel.userDirectory.collectAsStateWithLifecycle()
 
             RequestNotificationPermission()
 
-            TerriFlowTheme(themeMode = themeMode, appColor = appColor) {
+            TerriFlowTheme(themeMode = themeMode, appColor = appColor, textSize = textSize, contrastLevel = contrastLevel) {
                 CompositionLocalProvider(LocalUserDirectory provides userDirectory) {
                     Surface(
                         modifier = Modifier.fillMaxSize(),

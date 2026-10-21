@@ -1,5 +1,7 @@
 package com.mraphaelpy.terriflow.presentation.territories
 
+import com.mraphaelpy.terriflow.presentation.map.applyDarkTiles
+import androidx.compose.ui.graphics.luminance
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -62,11 +64,13 @@ internal fun FullMapEditor(
     val boundaryMarkers = remember { mutableListOf<Marker>() }
 
     Box(modifier = Modifier.fillMaxSize()) {
+        val darkTiles = MaterialTheme.colorScheme.surface.luminance() < 0.5f
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
                 Configuration.getInstance().userAgentValue = ctx.packageName
                 MapView(ctx).apply {
+                    applyDarkTiles(darkTiles)
                     setTileSource(TileSourceFactory.MAPNIK)
                     setMultiTouchControls(true)
                     val startLat = uiState.latitude ?: -23.5505
@@ -92,6 +96,7 @@ internal fun FullMapEditor(
                 }
             },
             update = { mapView ->
+                mapView.applyDarkTiles(darkTiles)
                 org.osmdroid.views.overlay.infowindow.InfoWindow.closeAllInfoWindowsOn(mapView)
                 mapView.overlays.removeAll { it is Marker || it is Polygon }
                 boundaryMarkers.clear()
@@ -251,11 +256,13 @@ internal fun PreviewMap(
     onExpand: () -> Unit
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
+        val darkTiles = MaterialTheme.colorScheme.surface.luminance() < 0.5f
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
                 Configuration.getInstance().userAgentValue = ctx.packageName
                 MapView(ctx).apply {
+                    applyDarkTiles(darkTiles)
                     val mapRef = this
                     setTileSource(TileSourceFactory.MAPNIK)
                     setMultiTouchControls(false)
@@ -275,6 +282,7 @@ internal fun PreviewMap(
                 }
             },
             update = { mapView ->
+                mapView.applyDarkTiles(darkTiles)
                 mapView.overlays.removeAll { it is Marker || it is Polygon }
                 
                 if (boundaryPoints.size >= 3) {
