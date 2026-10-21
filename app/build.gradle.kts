@@ -128,6 +128,8 @@ dependencies {
     // OSMDroid (mapa offline, sem API key)
     implementation(libs.osmdroid.android)
 
+    implementation(libs.material.color.utilities)
+
     // Tests
     testImplementation(libs.junit)
     testImplementation(libs.mockk)

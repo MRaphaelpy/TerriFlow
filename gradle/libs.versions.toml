@@ -29,6 +29,7 @@ espressoCore = "3.6.1"
 mockk = "1.14.2"
 coroutinesTest = "1.10.2"
 robolectric = "4.14.1"
+materialColorUtilities = "2.1.1"
 androidxTestCore = "1.6.1"
 
 [libraries]
@@ -92,6 +93,7 @@ androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-co
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutinesTest" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
+material-color-utilities = { group = "com.materialkolor", name = "material-color-utilities", version.ref = "materialColorUtilities" }
 androidx-test-core = { group = "androidx.test", name = "core-ktx", version.ref = "androidxTestCore" }
 
 [plugins]

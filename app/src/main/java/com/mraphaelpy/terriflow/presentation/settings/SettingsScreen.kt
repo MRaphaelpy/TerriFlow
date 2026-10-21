@@ -1,5 +1,19 @@
 package com.mraphaelpy.terriflow.presentation.settings
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.ui.graphics.luminance
+import com.mraphaelpy.terriflow.ui.theme.SeedColorSchemes
+import com.mraphaelpy.terriflow.ui.theme.label
+import com.mraphaelpy.terriflow.ui.theme.seed
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -68,8 +82,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -90,10 +102,6 @@ import com.mraphaelpy.terriflow.domain.model.label
 import com.mraphaelpy.terriflow.domain.repository.AppColor
 import com.mraphaelpy.terriflow.domain.repository.ThemeMode
 import com.mraphaelpy.terriflow.presentation.components.UserAvatar
-import com.mraphaelpy.terriflow.ui.theme.TerriBlue
-import com.mraphaelpy.terriflow.ui.theme.TerriGreen
-import com.mraphaelpy.terriflow.ui.theme.TerriOrange
-import com.mraphaelpy.terriflow.ui.theme.TerriPurple
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -320,44 +328,94 @@ private fun ThemeSelector(selected: ThemeMode, onSelect: (ThemeMode) -> Unit) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ColorSelector(selected: AppColor, onSelect: (AppColor) -> Unit) {
     val supportsDynamic = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-        ColorOption(Brush.linearGradient(listOf(TerriGreen, TerriGreen)), "Verde", selected == AppColor.DEFAULT) { onSelect(AppColor.DEFAULT) }
-        ColorOption(Brush.linearGradient(listOf(TerriBlue, TerriBlue)), "Azul", selected == AppColor.BLUE) { onSelect(AppColor.BLUE) }
-        ColorOption(Brush.linearGradient(listOf(TerriPurple, TerriPurple)), "Roxo", selected == AppColor.PURPLE) { onSelect(AppColor.PURPLE) }
-        ColorOption(Brush.linearGradient(listOf(TerriOrange, TerriOrange)), "Laranja", selected == AppColor.ORANGE) { onSelect(AppColor.ORANGE) }
-        if (supportsDynamic) {
+    val options = AppColor.entries.filter { it != AppColor.DYNAMIC || supportsDynamic }
+    val isDark = MaterialTheme.colorScheme.surface.luminance() < 0.5f
+    val context = LocalContext.current
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        maxItemsInEachRow = 4,
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        options.forEach { option ->
+            val scheme = remember(option, isDark) {
+                when {
+                    option != AppColor.DYNAMIC -> SeedColorSchemes.of(option.seed, isDark)
+                    isDark -> dynamicDarkColorScheme(context)
+                    else -> dynamicLightColorScheme(context)
+                }
+            }
             ColorOption(
-                Brush.sweepGradient(listOf(TerriGreen, TerriBlue, TerriPurple, TerriOrange, TerriGreen)),
-                "Sistema",
-                selected == AppColor.DYNAMIC,
-                icon = Icons.Default.AutoAwesome
-            ) { onSelect(AppColor.DYNAMIC) }
+                scheme = scheme,
+                label = option.label,
+                selected = selected == option,
+                icon = if (option == AppColor.DYNAMIC) Icons.Default.AutoAwesome else null,
+                modifier = Modifier.weight(1f)
+            ) { onSelect(option) }
         }
     }
 }
 
 @Composable
-private fun ColorOption(brush: Brush, label: String, selected: Boolean, icon: ImageVector? = null, onClick: () -> Unit) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+private fun ColorOption(
+    scheme: ColorScheme,
+    label: String,
+    selected: Boolean,
+    icon: ImageVector?,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    val ringWidth by animateDpAsState(if (selected) 3.dp else 0.dp, label = "ring")
+    val cornerPercent by animateIntAsState(if (selected) 30 else 50, label = "corner")
+    Column(
+        modifier = modifier
+            .clip(MaterialTheme.shapes.large)
+            .selectable(selected = selected, onClick = onClick, role = Role.RadioButton)
+            .padding(vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        val shape = RoundedCornerShape(cornerPercent)
         Box(
             modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(brush)
-                .then(if (selected) Modifier.border(3.dp, MaterialTheme.colorScheme.onSurface, CircleShape) else Modifier)
-                .clickable(onClick = onClick)
-                .semantics { role = Role.RadioButton },
+                .size(56.dp)
+                .border(ringWidth, MaterialTheme.colorScheme.onSurface, shape)
+                .padding(if (selected) 5.dp else 0.dp)
+                .clip(shape),
             contentAlignment = Alignment.Center
         ) {
+            Column(Modifier.matchParentSize()) {
+                Box(Modifier.fillMaxWidth().weight(1f).background(scheme.primary))
+                Row(Modifier.fillMaxWidth().weight(1f)) {
+                    Box(Modifier.fillMaxHeight().weight(1f).background(scheme.secondaryContainer))
+                    Box(Modifier.fillMaxHeight().weight(1f).background(scheme.tertiary))
+                }
+            }
             when {
-                selected -> Icon(Icons.Default.Check, contentDescription = "Selecionado", tint = Color.White)
-                icon != null -> Icon(icon, contentDescription = null, tint = Color.White)
+                selected -> SwatchBadge(Icons.Default.Check, scheme)
+                icon != null -> SwatchBadge(icon, scheme)
             }
         }
-        Text(label, style = MaterialTheme.typography.labelSmall)
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1
+        )
+    }
+}
+
+@Composable
+private fun SwatchBadge(icon: ImageVector, scheme: ColorScheme) {
+    Box(
+        modifier = Modifier.size(24.dp).background(scheme.primaryContainer, CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription = null, tint = scheme.onPrimaryContainer, modifier = Modifier.size(16.dp))
     }
 }
 

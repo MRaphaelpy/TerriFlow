@@ -7,7 +7,7 @@ enum class ThemeMode {
 }
 
 enum class AppColor {
-    DEFAULT, DYNAMIC, BLUE, PURPLE, ORANGE
+    DEFAULT, TEAL, BLUE, INDIGO, PURPLE, PINK, RED, ORANGE, AMBER, OLIVE, BROWN, DYNAMIC
 }
 
 interface SettingsRepository {
