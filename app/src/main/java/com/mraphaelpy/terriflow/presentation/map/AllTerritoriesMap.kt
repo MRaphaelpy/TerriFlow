@@ -198,7 +198,7 @@ fun AllTerritoriesMap(
                 added = true
                 val polygons = buildPolygons(key) { currentOnClick(id) }
                 polygons.forEach { mapView.overlays.add(0, it) }
-                val blockLabels = key.territory.blockPolygons.takeIf { it.isNotEmpty() }?.let { blocks ->
+                val blockLabels = key.territory.blockPolygons.takeIf { it.isNotEmpty() && (key.mine || key.highlighted) }?.let { blocks ->
                     BlockLabelsOverlay(blocks, mapView.resources.displayMetrics.density, minZoom = BLOCK_LABELS_MIN_ZOOM)
                 }
                 blockLabels?.let { labels ->
