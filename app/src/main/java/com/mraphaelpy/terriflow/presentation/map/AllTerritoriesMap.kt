@@ -48,6 +48,13 @@ class TerritoryMapState {
         fitTo(shape, padding = 1.6f)
     }
 
+    fun distanceFromMe(lat: Double, lng: Double): Float? {
+        val fix = locationOverlay?.lastFix ?: return null
+        val result = FloatArray(1)
+        android.location.Location.distanceBetween(fix.latitude, fix.longitude, lat, lng, result)
+        return result[0]
+    }
+
     fun centerOnMyLocation(): Boolean {
         val map = mapView ?: return false
         val overlay = locationOverlay ?: return false

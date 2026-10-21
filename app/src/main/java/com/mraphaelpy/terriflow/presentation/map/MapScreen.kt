@@ -6,41 +6,28 @@ import android.content.Context
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Directions
 import androidx.compose.material.icons.filled.LocationOff
-import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material.icons.filled.OpenInFull
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PersonOff
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material.icons.filled.ZoomOutMap
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -49,24 +36,20 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.mraphaelpy.terriflow.domain.model.Territory
 import com.mraphaelpy.terriflow.domain.model.center
-import com.mraphaelpy.terriflow.domain.model.label
 import com.mraphaelpy.terriflow.presentation.components.PillSearchField
 import com.mraphaelpy.terriflow.presentation.components.TerritoryFilterChips
 import com.mraphaelpy.terriflow.presentation.components.statusColor
@@ -112,11 +95,15 @@ fun MapScreen(
     val selectedTerritory = uiState.mappedTerritories.firstOrNull { it.id == selectedId }
 
     if (selectedTerritory != null) {
+        val distance = remember(selectedTerritory.id) {
+            selectedTerritory.center?.let { mapState.distanceFromMe(it.lat, it.lng) }
+        }
         ModalBottomSheet(onDismissRequest = { selectedId = null }) {
-            TerritoryMapCard(
+            TerritoryMapSheet(
                 territory = selectedTerritory,
                 territoryColor = palette[selectedTerritory.id] ?: statusColor(selectedTerritory.status),
                 isMine = selectedTerritory.currentResponsibleId == uiState.currentUserId,
+                distanceMeters = distance,
                 onOpen = {
                     selectedId = null
                     if (highlightId == selectedTerritory.id) onNavigateBack() else onNavigateToTerritory(selectedTerritory.id)
@@ -261,103 +248,6 @@ private fun MapMessageCard(
             if (actionLabel != null) {
                 TextButton(onClick = onAction) { Text(actionLabel) }
             }
-        }
-    }
-}
-
-@Composable
-private fun TerritoryMapCard(
-    territory: Territory,
-    territoryColor: Color,
-    isMine: Boolean,
-    onOpen: () -> Unit
-) {
-    val context = LocalContext.current
-    val color = statusColor(territory.status)
-    val center = territory.center
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-            .padding(bottom = 32.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Box(
-                modifier = Modifier
-                    .padding(top = 4.dp)
-                    .size(14.dp)
-                    .background(territoryColor, CircleShape)
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    territory.code,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    territory.name,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Surface(shape = RoundedCornerShape(50), color = color.copy(alpha = 0.15f)) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Box(modifier = Modifier.size(8.dp).background(color, CircleShape))
-                    Text(territory.status.label(), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium)
-                }
-            }
-        }
-
-        HorizontalDivider()
-
-        InfoRow(
-            icon = if (territory.currentResponsibleName != null) Icons.Default.Person else Icons.Default.PersonOff,
-            label = "Responsável",
-            value = when {
-                territory.currentResponsibleName == null -> "Sem responsável"
-                isMine -> "${territory.currentResponsibleName} (você)"
-                else -> territory.currentResponsibleName
-            }
-        )
-        if (territory.location.isNotBlank()) {
-            InfoRow(icon = Icons.Default.LocationOn, label = "Localização", value = territory.location)
-        }
-
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(
-                onClick = { center?.let { openDirections(context, it.lat, it.lng) } },
-                enabled = center != null,
-                modifier = Modifier.weight(1f)
-            ) {
-                Icon(Icons.Default.Directions, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Como chegar")
-            }
-            Button(onClick = onOpen, modifier = Modifier.weight(1f)) {
-                Icon(Icons.Default.OpenInFull, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(6.dp))
-                Text("Detalhes")
-            }
-        }
-    }
-}
-
-@Composable
-private fun InfoRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, value: String) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Column {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
         }
     }
 }
